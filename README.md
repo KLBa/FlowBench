@@ -2,6 +2,8 @@
 
 This repository provides comprehensive tools and pre-trained models for benchmarking the robustness of optical flow estimation algorithms.
 
+Link to Paper: https://github.com/shashankskagnihotri/FlowBench.git
+
 ---
 
 ## Installation
@@ -205,3 +207,23 @@ model, results = evaluate(
 - `retrieve_existing`: Works as described above
 - `threat_model`: Must be `'3DCommonCorruption'`; returns evaluations across 8 corruption types
 - `severity`: An integer from 1 to 5 indicating the corruption severity
+
+# CITATION
+If you use this work, please cite:
+
+```
+@article{
+agnihotri2025flowbench,
+title={FlowBench: Benchmarking Optical Flow Estimation Methods for Reliability and Generalization},
+author={Shashank Agnihotri and Julian Yuya Caspary and Luca Schwarz and Xinyan Gao and Jenny Schmalfuss and Andres Bruhn and Margret Keuper},
+journal={Transactions on Machine Learning Research},
+issn={2835-8856},
+year={2025},
+url={https://openreview.net/forum?id=Kh4bj6YDNm},
+note={}
+}
+```
+or
+```
+Agnihotri, Shashank, Julian Yuya Caspary, Luca Schwarz, Xinyan Gao, Jenny Schmalfuss, Andrés Bruhn, and Margret Keuper. “FlowBench: Benchmarking Optical Flow Estimation Methods for Reliability and Generalization.” Transactions on Machine Learning Research, 2025. https://openreview.net/forum?id=Kh4bj6YDNm
+```
