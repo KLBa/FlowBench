@@ -2,7 +2,11 @@
 
 This repository provides comprehensive tools and pre-trained models for benchmarking the robustness of optical flow estimation algorithms.
 
-Link to Paper: https://github.com/shashankskagnihotri/FlowBench.git
+[Link to Paper](https://openreview.net/forum?id=Kh4bj6YDNm)
+
+[YouTube Video](https://youtu.be/_AUKi_48vmc)
+
+Accepted at Transactions on Machine Learning Research (TMLR), 2025
 
 ---
 
