@@ -1120,7 +1120,7 @@ if __name__ == "__main__":
         FlowModel = get_model_reference(sys.argv[1])
         parser = FlowModel.add_model_specific_args(parser)
 
-    add_datasets_to_parser(parser, "./ptlflow/datasets.yml")
+    add_datasets_to_parser(parser, "./ptlflow/datasets.yaml")
 
     args = parser.parse_args()
 
@@ -1152,7 +1152,7 @@ def evaluate(model_name, dataset, pretrained_ckpt, dataset_path=None, threat_mod
         output_path (str): Path to save the attack results.
         attack_name (str): Specific attack to use (if applicable).
         write_outputs (bool): Whether to save attack outputs.
-        dataset_config (str): Path to the dataset config file (default: "./ptlflow/datasets.yml").
+        dataset_config (str): Path to the dataset config file (default: "./ptlflow/datasets.yaml").
         additional_args (dict): Any additional arguments that would be needed by the attack or model.
     """
 

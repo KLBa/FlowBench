@@ -42,7 +42,7 @@ pip install -e .
 
 1. Download the KITTI 2015 dataset from the [KITTI Scene Flow Benchmark](https://www.cvlibs.net/datasets/kitti/eval_scene_flow.php?benchmark=stereo).
 2. After extraction, verify that the contents include `training/` and `testing/` directories.
-3. Place the dataset at `datasets/kitti2015` or adjust the path in `ptlflow/datasets.yml`.
+3. Place the dataset at `datasets/kitti2015` or adjust the path in `ptlflow/datasets.yaml`.
 
 ### MPI Sintel
 
@@ -50,7 +50,7 @@ pip install -e .
 2. After extraction, verify that the contents include `training/` and `test/` directories.
 3. Place the dataset at `datasets/Sintel`.
 4. Download the MPI Sintel Depth training data from the [MPI Sintel Depth Training Data](http://sintel.is.tue.mpg.de/depth).
-5. Extract the archive and verify it contains `training/camdata_left`, `training/depth`, and `training/depth_viz`. Place these directories under `datasets/Sintel/training` or adjust the path in `ptlflow/datasets.yml`.
+5. Extract the archive and verify it contains `training/camdata_left`, `training/depth`, and `training/depth_viz`. Place these directories under `datasets/Sintel/training` or adjust the path in `ptlflow/datasets.yaml`.
 
 Alternatively, use our convenience script:
 

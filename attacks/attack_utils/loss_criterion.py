@@ -28,11 +28,11 @@ def avg_epe(flow1, flow2):
 
 
 def calc_epe_metrics(model, preds, inputs, iteration, targeted_inputs=None):
-    epe_gt = model.val_metrics(preds, inputs)["val/epe"]
+    epe_gt = model.val_metrics[0](preds, inputs)["val/epe"]
     if targeted_inputs is None:
         return {f"val/epe_gt_i{iteration}": epe_gt}
     else:
-        epe_tgt = model.val_metrics(preds, targeted_inputs)["val/epe"]
+        epe_tgt = model.val_metrics[0](preds, targeted_inputs)["val/epe"]
         return {
             f"val/epe_ground_truth_i{iteration}": epe_gt,
             f"val/epe_target_i{iteration}": epe_tgt,

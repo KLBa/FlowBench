@@ -288,6 +288,8 @@ class AttackArgumentParser:
 
 
 def attack_targeted_string(s):
+    if isinstance(s, bool):
+        return s
     if s.upper() in {"TRUE", "1"}:
         return True
     elif s.upper() in {"FALSE", "0"}:

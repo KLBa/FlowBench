@@ -1,7 +1,7 @@
 from test import evaluate, load_model
 import json
 #attack_args = {"attack_epsilon": 8/255}
-#evaluate(model_name='raft', pretrained_ckpt='kitti', dataset='kitti-2015', dataset_config_path="./ptlflow/datasets.yml")
+#evaluate(model_name='raft', pretrained_ckpt='kitti', dataset='kitti-2015', dataset_config_path="./ptlflow/datasets.yaml")
 
 sintel_model_names = [
     "raft",

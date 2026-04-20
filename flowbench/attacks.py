@@ -1296,7 +1296,7 @@ if __name__ == "__main__":
         FlowModel = get_model_reference(sys.argv[1])
         parser = FlowModel.add_model_specific_args(parser)
 
-    add_datasets_to_parser(parser, "./ptlflow/datasets.yml")
+    add_datasets_to_parser(parser, "./ptlflow/datasets.yaml")
 
     args = parser.parse_args()
 
