@@ -1,7 +1,8 @@
-""" MLP module w/ dropout and configurable activation layer
+"""MLP module w/ dropout and configurable activation layer
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
+
 from torch import nn as nn
 
 

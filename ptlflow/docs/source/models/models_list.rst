@@ -16,7 +16,7 @@ CCMR
 
 - Reference code: `https://github.com/cv-stuttgart/CCMR <https://github.com/cv-stuttgart/CCMR>`_
 
-- Model names: ``ccmr``, ``ccmr+``
+- Model names: ``ccmr``, ``ccmr_p``
 
 CRAFT
 -----
@@ -62,6 +62,15 @@ DIP
 
 - Model names: ``dip``
 
+DPFlow
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/dpflow>`__
+
+- Paper: **DPFlow: Adaptive Optical Flow Estimation with a Dual-Pyramid Framework** - `https://arxiv.org/abs/2503.14880 <https://arxiv.org/abs/2503.14880>`_
+
+- Model names: ``dpflow``
+
 FastFlownet
 -----------
 
@@ -84,6 +93,17 @@ Flow1D
 
 - Model names: ``flow1d``
 
+Flow-Anything
+-------------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flow_anything>`__
+
+- Paper: **Flow-Anything: Learning Real-World Optical Flow Estimation from Large-Scale Single-view Images** - `https://arxiv.org/abs/2506.07740 <https://arxiv.org/abs/2506.07740>`_
+
+- Reference code: `https://github.com/Sharpiless/Flow-Anything <https://github.com/Sharpiless/Flow-Anything>`_
+
+- Model names: ``flow_anything``
+
 FlowFormer
 ----------
 
@@ -104,7 +124,7 @@ FlowFormer++
 
 - Reference code: `https://github.com/XiaoyuShi97/FlowFormerPlusPlus <https://github.com/XiaoyuShi97/FlowFormerPlusPlus>`_
 
-- Model names: ``flowformer++``
+- Model names: ``flowformer_pp``
 
 Flownet
 -------
@@ -120,6 +140,17 @@ Flownet
 - Reference code: `https://github.com/NVIDIA/flownet2-pytorch <https://github.com/NVIDIA/flownet2-pytorch>`_
 
 - Model names: ``flownets``, ``flownetc``, ``flownet2``, ``flownetcs``, ``flownetcss``, ``flownetsd``
+
+FlowSeek
+--------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/flowseek>`__
+
+- Paper: **FlowSeek: Optical Flow Made Easier with Depth Foundation Models and Motion Bases** - `https://arxiv.org/abs/2509.05297 <https://arxiv.org/abs/2509.05297>`_
+
+- Reference code: `https://github.com/mattpoggi/flowseek <https://github.com/mattpoggi/flowseek>`_
+
+- Model names: ``flowseek_t``, ``flowseek_m``
 
 GMA
 ---
@@ -152,7 +183,7 @@ GMFlow+, UniMatch
 
 - Reference code: `https://github.com/autonomousvision/unimatch <https://github.com/autonomousvision/unimatch>`_
 
-- Model names: ``gmflow+``, ``gmflow+_sc2``, ``gmflow+_sc2_refine6``, ``unimatch``, ``unimatch_sc2``, ``unimatch_sc2_refine6``
+- Model names: ``gmflow_p``, ``gmflow_p_sc2``, ``gmflow_p_sc2_ref6``, ``unimatch``, ``unimatch_sc2``, ``unimatch_sc2_ref6``
 
 GMFlowNet
 ---------
@@ -277,6 +308,17 @@ MemFlow
 
 - Model names: ``memflow``, ``memflow_t``
 
+MEMFOF
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/memfof>`__
+
+- Paper: **MEMFOF: High-Resolution Training for Memory-Efficient Multi-Frame Optical Flow Estimation** - `https://arxiv.org/abs/2506.23151 <https://arxiv.org/abs/2506.23151>`_
+
+- Reference code: `https://github.com/msu-video-group/memfof <https://github.com/msu-video-group/memfof>`__
+
+- Model name: ``memfof``
+
 MS-RAFT+
 --------
 
@@ -286,10 +328,10 @@ MS-RAFT+
 
 - Reference code: `https://github.com/cv-stuttgart/MS_RAFT_plus <https://github.com/cv-stuttgart/MS_RAFT_plus>`_
 
-- Model names: ``ms_raft+``
+- Model names: ``ms_raft_p``
 
-NeuFlow
--------
+NeuFlow v1
+----------
 
 `[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/neuflow>`__
 
@@ -298,6 +340,17 @@ NeuFlow
 - Reference code: `https://github.com/neufieldrobotics/neuflow <https://github.com/neufieldrobotics/neuflow>`_
 
 - Model names: ``neuflow``
+
+NeuFlow v2
+----------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/neuflow2>`__
+
+- Paper: **NeuFlow v2: Push High-Efficiency Optical Flow To the Limit** - `https://arxiv.org/abs/2408.10161 <hhttps://arxiv.org/abs/2408.10161>`_
+
+- Reference code: `https://github.com/neufieldrobotics/NeuFlow_v2 <https://github.com/neufieldrobotics/NeuFlow_v2>`_
+
+- Model names: ``neuflow2``
 
 PWCNet
 ------
@@ -329,6 +382,17 @@ RAPIDFlow
 - Paper: **RAPIDFlow: Recurrent Adaptable Pyramids with Iterative Decoding for Efficient Optical Flow Estimation** - `https://hmorimitsu.com/publication/2024-icra-rapidflow/ <https://hmorimitsu.com/publication/2024-icra-rapidflow/>`_
 
 - Model names: ``rapidflow``, ``rapidflow_it1``, ``rapidflow_it2``, ``rapidflow_it3``, ``rapidflow_it6``, ``rapidflow_it12``
+
+ReCoVEr
+-------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/recover>`__
+
+- Paper: **Removing Cost Volumes from Optical Flow Estimators** - `https://arxiv.org/abs/2510.13317 <https://arxiv.org/abs/2510.13317>`_
+
+- Reference code: `https://github.com/visinf/recover <https://github.com/visinf/recover>`_
+
+- Model names: ``recover_cx``, ``recover_mn``, ``recover_rn``
 
 RPKNet
 ------
@@ -416,6 +480,15 @@ STaRFlow
 
 - Model names: ``starflow``
 
+StreamFlow
+------
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/streamflow>`__
+
+- Paper: **StreamFlow: Streamlined Multi-Frame Optical Flow Estimation for Video Sequences** - `https://arxiv.org/abs/2311.17099 <https://arxiv.org/abs/2311.17099>`_
+
+- Model names: ``streamflow``
+
 VCN
 ---
 
@@ -437,3 +510,14 @@ VideoFlow
 - Reference code: `https://github.com/XiaoyuShi97/VideoFlow <hhttps://github.com/XiaoyuShi97/VideoFlow>`_
 
 - Model names: ``videoflow_bof``, ``videoflow_mof``
+
+WAFT
+----
+
+`[source code] <https://github.com/hmorimitsu/ptlflow/tree/main/ptlflow/models/waft>`__
+
+- Paper: **WAFT: Warping-Alone Field Transforms for Optical Flow** - `https://arxiv.org/abs/2506.21526 <https://arxiv.org/abs/2506.21526>`_
+
+- Reference code: `https://github.com/princeton-vl/WAFT <https://github.com/princeton-vl/WAFT>`__
+
+- Model name: ``waft_dav2_a1``, ``waft_dav2_a2``, ``waft_dinov3_a2``, ``waft_twins_a2``

@@ -24,6 +24,43 @@ This is still under development, so some things may not work as intended. I plan
 
 ## What's new
 
+###  - v0.4.2
+
+- Added new models:
+  - Flow-Anything [https://arxiv.org/abs/2506.07740](https://arxiv.org/abs/2506.07740)
+  - FlowSeek [https://arxiv.org/abs/2509.05297](https://arxiv.org/abs/2509.05297)
+  - MEMFOF [https://arxiv.org/abs/2506.23151](https://arxiv.org/abs/2506.23151)
+  - ReCoVEr [https://arxiv.org/abs/2510.13317](https://arxiv.org/abs/2510.13317)
+  - WAFT [https://arxiv.org/abs/2506.21526](https://arxiv.org/abs/2506.21526)
+- Additions / fixes:
+  - Fix compatibility with Lightning < 2.7
+  - Add support to log to SwanLab
+
+###  - v0.4.1
+
+- Added new models:
+  - DPFlow [https://arxiv.org/abs/2503.14880](https://arxiv.org/abs/2503.14880)
+  - StreamFlow [https://arxiv.org/abs/2311.17099](https://arxiv.org/abs/2311.17099)
+- Additions / fixes:
+  - Add 4K read mode for Spring dataset
+  - Add missing arguments for Middlebury-ST and VIPER datasets
+  - Fix RAFT config files
+  - Fix RAPIDFlow config files
+
+###  - v0.4.0
+
+Major update to support Lightning 2 (finally!). However, it also introduces breaking changes from the previous v0.3 code. See the details below.
+
+- Transitioning from v0.3 to v0.4: check the [v0.4 upgrade guide](https://ptlflow.readthedocs.io/en/latest/starting/v04_upgrade_guide.html)
+- Added features:
+  - Support for YAML config files. See the [config file documentation](https://ptlflow.readthedocs.io/en/latest/starting/config_files.html)
+  - Table [comparing PTLFlow results with the original papers](https://ptlflow.readthedocs.io/en/latest/results/paper_ptlflow.html) to check the stability of the included models.
+- Added new models:
+  - NeuFlow v2 [https://arxiv.org/abs/2408.10161](https://arxiv.org/abs/2408.10161)
+- Add support for more datasets:
+  - Middlebury-ST [https://vision.middlebury.edu/stereo/data/scenes2014/]{https://vision.middlebury.edu/stereo/data/scenes2014/}
+  - VIPER [https://playing-for-benchmarks.org/](https://playing-for-benchmarks.org/)
+
 ###  - v0.3.2
 
 - Added new models:
@@ -78,12 +115,15 @@ This is still under development, so some things may not work as intended. I plan
 - CSFlow [https://arxiv.org/abs/2202.00909](https://arxiv.org/abs/2202.00909)
 - DICL-Flow [https://arxiv.org/abs/2010.14851](https://arxiv.org/abs/2010.14851)
 - DIP [https://arxiv.org/abs/2204.00330](https://arxiv.org/abs/2204.00330)
+- DPFlow [https://arxiv.org/abs/2503.14880](https://arxiv.org/abs/2503.14880)
 - FastFlowNet [https://arxiv.org/abs/2103.04524](https://arxiv.org/abs/2103.04524)
 - Flow1D [https://arxiv.org/abs/2103.04524](https://arxiv.org/abs/2103.04524)
+- Flow-Anything [https://arxiv.org/abs/2506.07740](https://arxiv.org/abs/2506.07740)
 - FlowFormer [https://arxiv.org/abs/2203.16194](https://arxiv.org/abs/2203.16194)
 - FlowFormer++ [https://arxiv.org/abs/2303.01237](https://arxiv.org/abs/2303.01237)
 - FlowNet [https://arxiv.org/abs/1504.06852](https://arxiv.org/abs/1504.06852)
 - FlowNet2 [https://arxiv.org/abs/1612.01925](https://arxiv.org/abs/1612.01925)
+- FlowSeek [https://arxiv.org/abs/2509.05297](https://arxiv.org/abs/2509.05297)
 - GMA [https://arxiv.org/abs/2104.02409](https://arxiv.org/abs/2104.02409)
 - GMFlow [https://arxiv.org/abs/2111.13680](https://arxiv.org/abs/2111.13680)
 - GMFlow+, UniMatch [https://arxiv.org/abs/2211.05783](https://arxiv.org/abs/2211.05783)
@@ -98,11 +138,14 @@ This is still under development, so some things may not work as intended. I plan
 - MaskFlownet [https://arxiv.org/abs/2003.10955](https://arxiv.org/abs/2003.10955)
 - MatchFlow [https://arxiv.org/abs/2303.08384](https://arxiv.org/abs/2303.08384)
 - MemFlow [https://arxiv.org/abs/2404.04808](https://arxiv.org/abs/2404.04808)
+- MEMFOF [https://arxiv.org/abs/2506.23151](https://arxiv.org/abs/2506.23151)
 - MS-RAFT+ [https://arxiv.org/abs/2210.16900](https://arxiv.org/abs/2210.16900)
-- NeuFlow [https://arxiv.org/abs/2403.10425](https://arxiv.org/abs/2403.10425)
+- NeuFlow v1 [https://arxiv.org/abs/2403.10425](https://arxiv.org/abs/2403.10425)
+- NeuFlow v2 [https://arxiv.org/abs/2408.10161](https://arxiv.org/abs/2408.10161)
 - PWCNet [https://arxiv.org/abs/1709.02371](https://arxiv.org/abs/1709.02371)
 - RAFT [https://arxiv.org/abs/2003.12039](https://arxiv.org/abs/2003.12039)
 - RAPIDFlow [https://hmorimitsu.com/publication/2024-icra-rapidflow/](https://hmorimitsu.com/publication/2024-icra-rapidflow/)
+- ReCoVEr [https://arxiv.org/abs/2510.13317](https://arxiv.org/abs/2510.13317)
 - RPKNet [https://hmorimitsu.com/publication/2024-aaai-rpknet](https://hmorimitsu.com/publication/2024-aaai-rpknet)
 - ScopeFlow [https://arxiv.org/abs/2002.10770](https://arxiv.org/abs/2002.10770)
 - SCV [https://arxiv.org/abs/2104.02166](https://arxiv.org/abs/2104.02166)
@@ -111,8 +154,10 @@ This is still under development, so some things may not work as intended. I plan
 - SKFlow [https://arxiv.org/abs/2205.14623](https://arxiv.org/abs/2205.14623)
 - SplatFlow [https://arxiv.org/abs/2306.08887](https://arxiv.org/abs/2306.08887)
 - STaRFlow [https://arxiv.org/abs/2007.05481](https://arxiv.org/abs/2007.05481)
+- StreamFlow [https://arxiv.org/abs/2311.17099](https://arxiv.org/abs/2311.17099)
 - VCN [https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf](https://papers.nips.cc/paper/2019/file/bbf94b34eb32268ada57a3be5062fe7d-Paper.pdf)
 - VideoFlow [https://arxiv.org/abs/2303.08340](https://arxiv.org/abs/2303.08340)
+- WAFT [https://arxiv.org/abs/2506.21526](https://arxiv.org/abs/2506.21526)
 
 Read more details about the models on [https://ptlflow.readthedocs.io/en/latest/models/models_list.html](https://ptlflow.readthedocs.io/en/latest/models/models_list.html).
 
@@ -128,8 +173,13 @@ Please take a look at the [documentation](https://ptlflow.readthedocs.io/) to le
 
 You can also check the notebooks below running on Google Colab for some practical examples:
 
-- [Inference with a pretrained model](https://colab.research.google.com/drive/1YARBRUGplqTRnRuY9sKIs6LY_2kWAWZJ?usp=sharing).
-- [Training and using the learned weights for inference](https://colab.research.google.com/drive/1mbuAEF728_jZpFEsQHXDxjIGAcB1-nVs?usp=sharing).
+- [Inference with a pretrained model](https://colab.research.google.com/drive/1_WXvIRweQJgex0X-HS0LFXBb0IWZIvR4?usp=sharing).
+- [Training and using the learned weights for inference](https://colab.research.google.com/drive/1b_SMGSXh9F9TkinqZt0c64EH-GE87HVi?usp=sharing).
+
+If you are using the previous v0.3.X code, then check the [v0.3.2 documentation](https://ptlflow.readthedocs.io/en/v0.3.2/) and the following example notebooks:
+
+- [Inference with a pretrained model (PTLFlow v0.3)](https://colab.research.google.com/drive/1YARBRUGplqTRnRuY9sKIs6LY_2kWAWZJ?usp=sharing).
+- [Training and using the learned weights for inference (PTLFlow v0.3)](https://colab.research.google.com/drive/1mbuAEF728_jZpFEsQHXDxjIGAcB1-nVs?usp=sharing).
 
 ## Licenses
 

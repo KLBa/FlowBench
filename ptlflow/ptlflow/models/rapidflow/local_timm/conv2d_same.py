@@ -1,7 +1,8 @@
-""" Conv2d w/ Same Padding
+"""Conv2d w/ Same Padding
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

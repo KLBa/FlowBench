@@ -1,7 +1,8 @@
-""" Model creation / weight loading / state_dict helpers
+"""Model creation / weight loading / state_dict helpers
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
+
 import logging
 import os
 import math
@@ -21,7 +22,6 @@ from .hub import (
     load_state_dict_from_url,
 )
 from .layers import Conv2dSame, Linear
-
 
 _logger = logging.getLogger(__name__)
 

@@ -20,10 +20,12 @@ compute basic metrics for occlusion, motion boundary and flow confidence estimat
 # limitations under the License.
 # =============================================================================
 
-from typing import Dict
+from typing import Dict, Sequence
 
-from torchmetrics import Metric
+import numpy as np
 import torch
+import torch.nn.functional as F
+from torchmetrics import Metric
 
 
 class FlowMetrics(Metric):
@@ -48,6 +50,7 @@ class FlowMetrics(Metric):
         average_mode: str = "epoch_mean",
         ema_decay: float = 0.99,
         f1_mode: str = "macro",
+        interpolate_pred_to_target_size: bool = False,
     ) -> None:
         """Initialize FlowMetrics.
 
@@ -65,6 +68,8 @@ class FlowMetrics(Metric):
             How to calculate the f1-score. Accepts one of these options {binary, macro, weighted}. If binary, then the f1-score
             is calculated only for the positive pixels. If macro, then the f1-score is the average of positive and negative
             scores. If weighted, then the average is weighted according to the number of positive/negative samples.
+        interpolate_pred_to_target_size : bool, default False
+            If True, the prediction is bilinearly interpolated to match the target size, if their sizes are different.
         """
         super().__init__(dist_sync_on_step=dist_sync_on_step)
 
@@ -75,6 +80,7 @@ class FlowMetrics(Metric):
         self.ema_decay = ema_decay
         self.f1_mode = f1_mode
         self.ema_max_count = min(100, int(1.0 / (1.0 - ema_decay)))
+        self.interpolate_pred_to_target_size = interpolate_pred_to_target_size
 
         self.add_state("epe", default=torch.tensor(0).float(), dist_reduce_fx="sum")
         self.add_state(
@@ -100,12 +106,20 @@ class FlowMetrics(Metric):
         )
         self.add_state("px5_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum")
 
-        self.add_state("outlier", default=torch.tensor(0).float(), dist_reduce_fx="sum")
+        self.add_state("flall", default=torch.tensor(0).float(), dist_reduce_fx="sum")
         self.add_state(
-            "outlier_non_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
+            "flall_non_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
         )
         self.add_state(
-            "outlier_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
+            "flall_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
+        )
+
+        self.add_state("wauc", default=torch.tensor(0).float(), dist_reduce_fx="sum")
+        self.add_state(
+            "wauc_non_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
+        )
+        self.add_state(
+            "wauc_occ", default=torch.tensor(0).float(), dist_reduce_fx="sum"
         )
 
         self.add_state("occ_f1", default=torch.tensor(0).float(), dist_reduce_fx="sum")
@@ -135,6 +149,9 @@ class FlowMetrics(Metric):
         targets : dict[str, torch.Tensor]
             The groundtruth of the predictions.
         """
+        preds = self._convert_dict_to_metrics_dtype(preds)
+        targets = self._convert_dict_to_metrics_dtype(targets)
+
         if self.average_mode == "epoch_mean":
             prev_weight = 1.0
             next_weight = 1.0
@@ -142,8 +159,30 @@ class FlowMetrics(Metric):
             prev_weight = self.ema_decay
             next_weight = 1.0 - self.ema_decay
 
+        metric_preds = {}
+        if self.interpolate_pred_to_target_size:
+            for k, v in preds.items():
+                if isinstance(v, torch.Tensor):
+                    v, orig_shape = self._to_bchw_shape(v)
+                    target_size = targets["flows"].shape[-2:]
+                    v = F.interpolate(
+                        v, target_size, mode="bilinear", align_corners=True
+                    )
+                    new_shape = list(orig_shape[:-2]) + list(target_size)
+                    v = v.view(*new_shape)
+
+                    if "flow" in k:
+                        scale_y = float(target_size[-2]) / orig_shape[-2]
+                        scale_x = float(target_size[-1]) / orig_shape[-1]
+                        v[..., 0, :, :] *= scale_x
+                        v[..., 1, :, :] *= scale_y
+
+                metric_preds[k] = v
+        else:
+            metric_preds = preds
+
         batch_size = self._get_batch_size(targets["flows"])
-        flow_pred = self._fix_shape(preds["flows"], batch_size)
+        flow_pred = self._fix_shape(metric_preds["flows"], batch_size)
         flow_target = self._fix_shape(targets["flows"], batch_size)
 
         valid_target = targets.get("valids")
@@ -169,13 +208,14 @@ class FlowMetrics(Metric):
         px1_mask = (epe < 1).float()
         px3_mask = (epe < 3).float()
         px5_mask = (epe < 5).float()
-        outlier_mask = ((epe > 3) & (epe > (0.05 * target_norm))).float() * 100
+        flall_mask = ((epe > 3) & (epe > (0.05 * target_norm))).float() * 100
         self.used_keys = [
             ("epe", "epe", "valid_target"),
             ("px1", "px1_mask", "valid_target"),
             ("px3", "px3_mask", "valid_target"),
             ("px5", "px5_mask", "valid_target"),
-            ("outlier", "outlier_mask", "valid_target"),
+            ("flall", "flall_mask", "valid_target"),
+            ("wauc", "epe", "valid_target"),
         ]
 
         if occlusion_target is not None:
@@ -191,39 +231,54 @@ class FlowMetrics(Metric):
                     ("px3_non_occ", "px3_mask", "valid_non_occ"),
                     ("px5_occ", "px5_mask", "valid_occ"),
                     ("px5_non_occ", "px5_mask", "valid_non_occ"),
-                    ("outlier_occ", "outlier_mask", "valid_occ"),
-                    ("outlier_non_occ", "outlier_mask", "valid_non_occ"),
+                    ("flall_occ", "flall_mask", "valid_occ"),
+                    ("flall_non_occ", "flall_mask", "valid_non_occ"),
+                    ("wauc_occ", "epe", "valid_occ"),
+                    ("wauc_non_occ", "epe", "valid_non_occ"),
                 ]
             )
             self.include_occlusion = True
 
-            if preds.get("occs") is not None:
-                occlusion_pred = self._fix_shape(preds["occs"], batch_size)
+            if metric_preds.get("occs") is not None:
+                occlusion_pred = self._fix_shape(metric_preds["occs"], batch_size)
                 occ_f1 = self._f1_score(
                     occlusion_pred, occlusion_target, mode=self.f1_mode
                 )
                 self.used_keys.extend([("occ_f1", "occ_f1", "valid_target")])
 
-        if preds.get("mbs") is not None and targets.get("mbs") is not None:
-            mb_pred = self._fix_shape(preds["mbs"], batch_size)
+        if metric_preds.get("mbs") is not None and targets.get("mbs") is not None:
+            mb_pred = self._fix_shape(metric_preds["mbs"], batch_size)
             mb_target = self._fix_shape(targets["mbs"], batch_size)
             mb_f1 = self._f1_score(mb_pred, mb_target, mode=self.f1_mode)
             self.used_keys.extend([("mb_f1", "mb_f1", "valid_target")])
 
-        if preds.get("confs") is not None:
+        if metric_preds.get("confs") is not None:
             conf_target = torch.exp(
                 -torch.pow(flow_target - flow_pred, 2).sum(dim=1, keepdim=True)
             )
-            conf_pred = self._fix_shape(preds["confs"], batch_size)
+            conf_pred = self._fix_shape(metric_preds["confs"], batch_size)
             conf_f1 = self._f1_score(conf_pred, conf_target, mode=self.f1_mode)
             self.used_keys.extend([("conf_f1", "conf_f1", "valid_target")])
 
         for v1, v2, v3 in self.used_keys:
-            setattr(
-                self,
-                v1,
-                prev_weight * getattr(self, v1)
-                + next_weight * self._compute_total(locals()[v2], locals()[v3]),
+            if "wauc" not in v1:
+                setattr(
+                    self,
+                    v1,
+                    prev_weight * getattr(self, v1)
+                    + next_weight * self._compute_total(locals()[v2], locals()[v3]),
+                )
+        self.wauc = prev_weight * self.wauc + next_weight * self._compute_total_wauc(
+            epe, valid_target
+        )
+        if occlusion_target is not None:
+            self.wauc_occ = (
+                prev_weight * self.wauc_occ
+                + next_weight * self._compute_total_wauc(epe, valid_occ)
+            )
+            self.wauc_non_occ = (
+                prev_weight * self.wauc_non_occ
+                + next_weight * self._compute_total_wauc(epe, valid_non_occ)
             )
 
         self.sample_count += batch_size
@@ -277,6 +332,22 @@ class FlowMetrics(Metric):
             tensor = tensor.sum()
         else:
             tensor = tensor.mean()
+        return tensor
+
+    def _convert_dict_to_metrics_dtype(
+        self, tensors: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        converted = {}
+        for key, value in tensors.items():
+            if isinstance(value, torch.Tensor):
+                converted[key] = self._to_metrics_dtype(value)
+            else:
+                converted[key] = value
+        return converted
+
+    def _to_metrics_dtype(self, tensor: torch.Tensor) -> torch.Tensor:
+        if tensor.is_floating_point() and tensor.dtype != torch.float32:
+            return tensor.float()
         return tensor
 
     def _f1_score(
@@ -356,6 +427,22 @@ class FlowMetrics(Metric):
             )
         return tensor
 
+    def _to_bchw_shape(self, tensor) -> tuple[torch.Tensor, Sequence[int]]:
+        orig_shape = tensor.shape
+        if len(tensor.shape) == 2:
+            tensor = tensor[None, None]
+        elif len(tensor.shape) == 3:
+            tensor = tensor[None]
+        elif len(tensor.shape) > 4:
+            batch_size = int(np.prod(orig_shape[:-3]))
+            tensor = tensor.view(
+                batch_size,
+                tensor.shape[-3],
+                tensor.shape[-2],
+                tensor.shape[-1],
+            )
+        return tensor, orig_shape
+
     def _get_batch_size(self, flow_tensor: torch.Tensor) -> int:
         if len(flow_tensor.shape) < 4:
             return 1
@@ -365,3 +452,30 @@ class FlowMetrics(Metric):
             return flow_tensor.shape[0] * flow_tensor.shape[1]
         elif len(flow_tensor.shape) == 6:
             return flow_tensor.shape[0]
+
+    def _compute_total_wauc(
+        self, epe: torch.Tensor, valid_mask: torch.Tensor
+    ) -> torch.Tensor:
+        # Code adapted from https://github.com/cv-stuttgart/springwebsite/blob/main/springeval/management/commands/evaluation.py
+        # MIT License
+        epe = epe.clone()
+        epe[valid_mask < 0.5] = 100
+        epe = epe.view(epe.shape[0], -1)
+        N = valid_mask.reshape(valid_mask.shape[0], -1).sum(dim=1)
+
+        wauc = torch.zeros(epe.shape[0], dtype=epe.dtype, device=epe.device)
+        sum_wi = 0
+        for i in range(1, 101):
+            wi = 1 - ((i - 1) / 100.0)
+            deltai = i / 20.0
+            err = (epe <= deltai).sum(dim=1)
+            wauc += wi * err
+            sum_wi += wi
+        wauc = 100 * wauc / (N * sum_wi + 1e-8)
+
+        if self.average_mode == "epoch_mean":
+            wauc = wauc.sum()
+        else:
+            wauc = wauc.mean()
+
+        return wauc

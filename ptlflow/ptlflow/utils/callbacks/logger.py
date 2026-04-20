@@ -36,6 +36,12 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 
 try:
+    import swanlab
+    from swanlab.integration.pytorch_lightning import SwanLabLogger
+except ImportError:
+    swanlab = None
+
+try:
     import wandb
 except ImportError:
     wandb = None
@@ -118,6 +124,10 @@ class LoggerCallback(Callback):
                 title_wb = title.replace("/", "-")
                 image_wb = wandb.Image(image_npy)
                 logger.experiment.log({title_wb: image_wb})
+            elif swanlab is not None and isinstance(logger, SwanLabLogger):
+                title_wb = title.replace("/", "-")
+                image_wb = swanlab.Image((255 * image_npy).astype(np.uint8))
+                logger.experiment.log({title_wb: image_wb})
 
     def on_train_batch_end(
         self,
@@ -160,15 +170,15 @@ class LoggerCallback(Callback):
         """
         self.train_images = {}
         limit_batches = (
-            pl_module.args.limit_train_batches
-            if pl_module.args.limit_train_batches is not None
+            trainer.limit_train_batches
+            if trainer.limit_train_batches is not None
             else 1.0
         )
         collect_idx = np.unique(
             np.linspace(
                 0,
                 self._compute_max_range(
-                    pl_module.train_dataloader_length, limit_batches
+                    trainer.datamodule.train_dataloader_length, limit_batches
                 ),
                 self.num_images,
                 dtype=np.int32,
@@ -200,7 +210,7 @@ class LoggerCallback(Callback):
         outputs: Dict[str, torch.Tensor],
         batch: Dict[str, torch.Tensor],
         batch_idx: int,
-        dataloader_idx: int,
+        dataloader_idx: int = 0,
     ) -> None:
         """Store one image to be logged, if the current batch_idx is in the log selection group.
 
@@ -237,17 +247,16 @@ class LoggerCallback(Callback):
         pl_module : BaseModel
             An instance of the optical flow model.
         """
-        self.val_dataloader_names = pl_module.val_dataloader_names
+        self.val_dataloader_names = trainer.datamodule.val_dataloader_names
         for dl_name in self.val_dataloader_names:
             self.val_images[dl_name] = {}
 
         limit_batches = (
-            pl_module.args.limit_val_batches
-            if pl_module.args.limit_val_batches is not None
-            else 1.0
+            trainer.limit_val_batches if trainer.limit_val_batches is not None else 1.0
         )
         for dname, dlen in zip(
-            pl_module.val_dataloader_names, pl_module.val_dataloader_lengths
+            trainer.datamodule.val_dataloader_names,
+            trainer.datamodule.val_dataloader_lengths,
         ):
             collect_idx = np.unique(
                 np.linspace(

@@ -16,21 +16,18 @@
 # limitations under the License.
 # =============================================================================
 
-import json
-import logging
 import math
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-import cv2
+import cv2 as cv
 from einops import rearrange
+from loguru import logger
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 from ptlflow.utils import flow_utils
-from ptlflow.utils.utils import config_logging
-
-config_logging()
 
 THIS_DIR = Path(__file__).resolve().parent
 
@@ -126,10 +123,8 @@ class BaseFlowDataset(Dataset):
         self.metadata = []
 
         self.flow_format = None
-        self.flow_read_mins = None
-        self.flow_read_maxs = None
-        self.flow_b_read_mins = None
-        self.flow_b_read_maxs = None
+
+        self.is_two_file_flow = False
 
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:  # noqa: C901
         """Retrieve and return one input.
@@ -150,32 +145,25 @@ class BaseFlowDataset(Dataset):
         """
         inputs = {}
 
-        inputs["images"] = [cv2.imread(str(path)) for path in self.img_paths[index]]
+        inputs["images"] = [cv.imread(str(path)) for path in self.img_paths[index]]
 
         if index < len(self.flow_paths):
             inputs["flows"], valids = self._get_flows_and_valids(
                 self.flow_paths[index],
                 flow_format=self.flow_format,
-                flow_min=self.flow_read_mins[index]
-                if (
-                    self.flow_read_mins is not None and len(self.flow_read_mins) > index
-                )
-                else None,
-                flow_max=self.flow_read_maxs[index]
-                if (
-                    self.flow_read_maxs is not None and len(self.flow_read_maxs) > index
-                )
-                else None,
             )
             if self.get_valid_mask:
                 inputs["valids"] = valids
 
         if self.get_occlusion_mask:
             if index < len(self.occ_paths):
-                inputs["occs"] = [
-                    cv2.imread(str(path), 0)[:, :, None]
-                    for path in self.occ_paths[index]
-                ]
+                inputs["occs"] = []
+                for path in self.occ_paths[index]:
+                    if str(path).endswith("npy"):
+                        occ = np.load(path)
+                    else:
+                        occ = cv.imread(str(path), 0)
+                    inputs["occs"].append(occ[:, :, None])
             elif self.dataset_name.startswith("KITTI"):
                 noc_paths = [
                     str(p).replace("flow_occ", "flow_noc")
@@ -184,23 +172,11 @@ class BaseFlowDataset(Dataset):
                 _, valids_noc = self._get_flows_and_valids(
                     noc_paths,
                     flow_format=self.flow_format,
-                    flow_min=self.flow_read_mins[index]
-                    if (
-                        self.flow_read_mins is not None
-                        and len(self.flow_read_mins) > index
-                    )
-                    else None,
-                    flow_max=self.flow_read_maxs[index]
-                    if (
-                        self.flow_read_maxs is not None
-                        and len(self.flow_read_maxs) > index
-                    )
-                    else None,
                 )
                 inputs["occs"] = [valids[i] - valids_noc[i] for i in range(len(valids))]
         if self.get_motion_boundary_mask and index < len(self.mb_paths):
             inputs["mbs"] = [
-                cv2.imread(str(path), 0)[:, :, None] for path in self.mb_paths[index]
+                cv.imread(str(path), 0)[:, :, None] for path in self.mb_paths[index]
             ]
 
         if self.get_backward:
@@ -208,29 +184,20 @@ class BaseFlowDataset(Dataset):
                 inputs["flows_b"], valids_b = self._get_flows_and_valids(
                     self.flow_b_paths[index],
                     flow_format=self.flow_format,
-                    flow_min=self.flow_b_read_mins[index]
-                    if (
-                        self.flow_b_read_mins is not None
-                        and len(self.flow_b_read_mins) > index
-                    )
-                    else None,
-                    flow_max=self.flow_b_read_maxs[index]
-                    if (
-                        self.flow_b_read_maxs is not None
-                        and len(self.flow_b_read_maxs) > index
-                    )
-                    else None,
                 )
                 if self.get_valid_mask:
                     inputs["valids_b"] = valids_b
             if self.get_occlusion_mask and index < len(self.occ_b_paths):
-                inputs["occs_b"] = [
-                    cv2.imread(str(path), 0)[:, :, None]
-                    for path in self.occ_b_paths[index]
-                ]
+                inputs["occs_b"] = []
+                for path in self.occ_b_paths[index]:
+                    if str(path).endswith("npy"):
+                        occ = np.load(path)
+                    else:
+                        occ = cv.imread(str(path), 0)
+                    inputs["occs_b"].append(occ[:, :, None])
             if self.get_motion_boundary_mask and index < len(self.mb_b_paths):
                 inputs["mbs_b"] = [
-                    cv2.imread(str(path), 0)[:, :, None]
+                    cv.imread(str(path), 0)[:, :, None]
                     for path in self.mb_b_paths[index]
                 ]
 
@@ -254,15 +221,16 @@ class BaseFlowDataset(Dataset):
         self,
         flow_paths: Sequence[str],
         flow_format: Optional[str] = None,
-        flow_min: Optional[float] = None,
-        flow_max: Optional[float] = None,
     ) -> Tuple[List[np.ndarray], List[Optional[np.ndarray]]]:
         flows = []
         valids = []
         for path in flow_paths:
-            flow = flow_utils.flow_read(
-                path, format=flow_format, flow_min=flow_min, flow_max=flow_max
-            )
+            if self.is_two_file_flow:
+                flow_x = -flow_utils.flow_read(path[0], format=flow_format)
+                flow_y = -flow_utils.flow_read(path[1], format=flow_format)
+                flow = np.stack([flow_x, flow_y], 2)
+            else:
+                flow = flow_utils.flow_read(path, format=flow_format)
 
             nan_mask = np.isnan(flow)
             flow[nan_mask] = self.max_flow + 1
@@ -280,14 +248,14 @@ class BaseFlowDataset(Dataset):
 
     def _log_status(self) -> None:
         if self.__len__() == 0:
-            logging.warning(
-                "No samples were found for %s dataset. Be sure to update the dataset path in datasets.yml, "
+            logger.warning(
+                "No samples were found for {} dataset. Be sure to update the dataset path in datasets.yml, "
                 "or provide the path by the argument --[dataset_name]_root_dir.",
                 self.dataset_name,
             )
         else:
-            logging.info(
-                "Loading %d samples from %s dataset.", self.__len__(), self.dataset_name
+            logger.info(
+                "Loading {} samples from {} dataset.", self.__len__(), self.dataset_name
             )
 
     def _extend_paths_list(
@@ -305,9 +273,12 @@ class BaseFlowDataset(Dataset):
         elif sequence_position == "last":
             begin_pad = sequence_length - 2
             end_pad = 0
+        elif sequence_position == "all":
+            begin_pad = 0
+            end_pad = 0
         else:
             raise ValueError(
-                f"Invalid sequence_position. Must be one of ('first', 'middle', 'last'). Received: {sequence_position}"
+                f"Invalid sequence_position. Must be one of ('first', 'middle', 'last', 'all'). Received: {sequence_position}"
             )
         for _ in range(begin_pad):
             paths_list.insert(0, paths_list[0])
@@ -397,7 +368,6 @@ class AutoFlowDataset(BaseFlowDataset):
                 "is_val": paths[0].stem in val_names,
                 "misc": "",
                 "is_seq_start": True,
-                "is_seq_end": True,
             }
             for paths in self.img_paths
         ]
@@ -497,7 +467,6 @@ class FlyingChairsDataset(BaseFlowDataset):
                 "is_val": paths[0].stem in val_names,
                 "misc": "",
                 "is_seq_start": True,
-                "is_seq_end": True,
             }
             for paths in self.img_paths
         ]
@@ -512,13 +481,13 @@ class FlyingChairs2Dataset(BaseFlowDataset):
         self,
         root_dir: str,
         split: str = "train",
-        add_reverse: bool = True,
+        add_reverse: bool = False,
         transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
         max_flow: float = 1000.0,
         get_valid_mask: bool = True,
-        get_occlusion_mask: bool = True,
-        get_motion_boundary_mask: bool = True,
-        get_backward: bool = True,
+        get_occlusion_mask: bool = False,
+        get_motion_boundary_mask: bool = False,
+        get_backward: bool = False,
         get_meta: bool = True,
     ) -> None:
         """Initialize FlyingChairs2Dataset.
@@ -672,7 +641,6 @@ class FlyingChairs2Dataset(BaseFlowDataset):
                 "is_val": False,
                 "misc": "",
                 "is_seq_start": True,
-                "is_seq_end": True,
             }
             for paths in self.img_paths
         ]
@@ -764,7 +732,8 @@ class FlyingThings3DDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name="FlyingThings3D",
@@ -924,8 +893,15 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                             sequence_position,
                                         )
 
+                                step_size = (
+                                    (self.sequence_length - 1)
+                                    if sequence_position == "all"
+                                    else 1
+                                )
                                 for i in range(
-                                    len(image_paths) - self.sequence_length + 1
+                                    0,
+                                    len(image_paths) - self.sequence_length + 1,
+                                    step_size,
                                 ):
                                     self.img_paths.append(
                                         image_paths[i : i + self.sequence_length]
@@ -953,10 +929,6 @@ class FlyingThings3DDataset(BaseFlowDataset):
                                             "is_val": False,
                                             "misc": "",
                                             "is_seq_start": i == 0,
-                                            "is_seq_end": i
-                                            == (
-                                                len(image_paths) - self.sequence_length
-                                            ),
                                         }
                                     )
                                     if self.get_backward:
@@ -1062,7 +1034,8 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name="FlyingThings3DSubset",
@@ -1122,7 +1095,14 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                             flow_group = self._extend_paths_list(
                                 flow_group, sequence_length, sequence_position
                             )
-                            for i in range(len(flow_group) - self.sequence_length + 2):
+                            step_size = (
+                                (self.sequence_length - 1)
+                                if sequence_position == "all"
+                                else 1
+                            )
+                            for i in range(
+                                0, len(flow_group) - self.sequence_length + 2, step_size
+                            ):
                                 flow_paths = flow_group[
                                     i : i + self.sequence_length - 1
                                 ]
@@ -1175,8 +1155,6 @@ class FlyingThings3DSubsetDataset(BaseFlowDataset):
                                         "is_val": False,
                                         "misc": "",
                                         "is_seq_start": i == 0,
-                                        "is_seq_end": i
-                                        == (len(flow_group) - self.sequence_length + 1),
                                     }
                                 )
 
@@ -1298,7 +1276,8 @@ class Hd1kDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name="HD1K",
@@ -1352,7 +1331,8 @@ class Hd1kDataset(BaseFlowDataset):
             seq_img_names = self._extend_paths_list(
                 seq_img_names, sequence_length, sequence_position
             )
-            for i in range(len(seq_img_names) - self.sequence_length + 1):
+            step_size = (self.sequence_length - 1) if sequence_position == "all" else 1
+            for i in range(0, len(seq_img_names) - self.sequence_length + 1, step_size):
                 self.img_paths.append(
                     [
                         Path(root_dir) / split_dir / "image_2" / (n + ".png")
@@ -1373,7 +1353,6 @@ class Hd1kDataset(BaseFlowDataset):
                         "is_val": (seq_img_names[i] in val_names),
                         "misc": "",
                         "is_seq_start": True,
-                        "is_seq_end": True,
                     }
                 )
 
@@ -1513,7 +1492,6 @@ class KittiDataset(BaseFlowDataset):
                         "is_val": img1_paths[i].stem in val_names,
                         "misc": ver,
                         "is_seq_start": True,
-                        "is_seq_end": True,
                     }
                     for i in range(len(img1_paths))
                     if img1_paths[i].stem not in remove_names
@@ -1573,7 +1551,8 @@ class SintelDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         if isinstance(pass_names, str):
             pass_names = [pass_names]
@@ -1652,7 +1631,13 @@ class SintelDataset(BaseFlowDataset):
                             occ_paths, sequence_length, sequence_position
                         )
                         assert len(occ_paths) == len(flow_paths)
-                for i in range(len(image_paths) - self.sequence_length + 1):
+
+                step_size = (
+                    (self.sequence_length - 1) if sequence_position == "all" else 1
+                )
+                for i in range(
+                    0, len(image_paths) - self.sequence_length + 1, step_size
+                ):
                     self.img_paths.append(image_paths[i : i + self.sequence_length])
                     if len(flow_paths) > 0:
                         self.flow_paths.append(
@@ -1671,8 +1656,6 @@ class SintelDataset(BaseFlowDataset):
                             "is_val": seq_name in val_seqs,
                             "misc": seq_name,
                             "is_seq_start": i == 0,
-                            "is_seq_end": i
-                            == (len(image_paths) - self.sequence_length),
                         }
                     )
 
@@ -1706,6 +1689,8 @@ class SpringDataset(BaseFlowDataset):
         sequence_length: int = 2,
         sequence_position: str = "first",
         reverse_only: bool = False,
+        subsample: bool = False,
+        is_image_4k: bool = False,
     ) -> None:
         """Initialize SintelDataset.
 
@@ -1738,9 +1723,17 @@ class SpringDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         reverse_only : bool, default False
             If True, only uses the backward samples, discarding the forward ones.
+        subsample : bool, default False
+            If True, the groundtruth is subsampled from 4K to 2K by neareast subsampling.
+            If False, and is_image_4k is also False, then the groundtruth is reshaped as: einops.rearrange("b c (h nh) (w nw) -> b (nh nw) c h w", nh=2, nw=2),
+            which corresponds to stacking the predictions of every 2x2 blocks.
+            If False, and is_image_4k is True, then the groundtruth is returned in its original 4D-shaped 4K resolution, but the flow values are doubled.
+        is_image_4k : bool, default False
+            If True, assumes the input images will be provided in 4K resolution, instead of the original 2K.
         """
         if isinstance(side_names, str):
             side_names = [side_names]
@@ -1760,6 +1753,11 @@ class SpringDataset(BaseFlowDataset):
         self.side_names = side_names
         self.sequence_length = sequence_length
         self.sequence_position = sequence_position
+        self.subsample = subsample
+        self.is_image_4k = is_image_4k
+
+        if self.is_image_4k:
+            assert not self.subsample
 
         # Get sequence names for the given split
         if split == "test":
@@ -1785,10 +1783,7 @@ class SpringDataset(BaseFlowDataset):
                     rev = direcs[0] == "BW"
                     image_paths = sorted(
                         (
-                            Path(self.root_dir)
-                            / split_dir
-                            / seq_name
-                            / f"frame_{side}"
+                            Path(self.root_dir) / split_dir / seq_name / f"frame_{side}"
                         ).glob("*.png"),
                         reverse=rev,
                     )
@@ -1830,7 +1825,12 @@ class SpringDataset(BaseFlowDataset):
                                 flow_paths
                             ), f"{seq_name}, {side}: {len(image_paths)-1} vs {len(flow_paths)}"
 
-                    for i in range(len(image_paths) - self.sequence_length + 1):
+                    step_size = (
+                        (self.sequence_length - 1) if sequence_position == "all" else 1
+                    )
+                    for i in range(
+                        0, len(image_paths) - self.sequence_length + 1, step_size
+                    ):
                         self.img_paths.append(image_paths[i : i + self.sequence_length])
                         if len(flow_paths) > 0:
                             self.flow_paths.append(
@@ -1849,8 +1849,6 @@ class SpringDataset(BaseFlowDataset):
                                 "is_val": False,
                                 "misc": seq_name,
                                 "is_seq_start": i == 0,
-                                "is_seq_end": i
-                                == (len(image_paths) - self.sequence_length),
                             }
                         )
 
@@ -1881,7 +1879,7 @@ class SpringDataset(BaseFlowDataset):
         """
         inputs = {}
 
-        inputs["images"] = [cv2.imread(str(path)) for path in self.img_paths[index]]
+        inputs["images"] = [cv.imread(str(path)) for path in self.img_paths[index]]
 
         if index < len(self.flow_paths):
             inputs["flows"], valids = self._get_flows_and_valids(self.flow_paths[index])
@@ -1896,13 +1894,64 @@ class SpringDataset(BaseFlowDataset):
                 if self.get_valid_mask:
                     inputs["valids_b"] = valids_b
 
-        if self.transform is not None:
-            inputs = self.transform(inputs)
+        if self.subsample:
+            inputs["flows"] = [f[::2, ::2] for f in inputs["flows"]]
+            inputs["valids"] = [v[::2, ::2] for v in inputs["valids"]]
+            if self.get_backward:
+                inputs["flows_b"] = [f[::2, ::2] for f in inputs["flows_b"]]
+                inputs["valids_b"] = [v[::2, ::2] for v in inputs["valids_b"]]
+            if self.transform is not None:
+                inputs = self.transform(inputs)
+        elif self.is_image_4k:
+            inputs["images"] = [
+                cv.resize(img, None, fx=2, fy=2, interpolation=cv.INTER_CUBIC)
+                for img in inputs["images"]
+            ]
+            if self.transform is not None:
+                inputs = self.transform(inputs)
+            if "flows" in inputs:
+                inputs["flows"] = 2 * inputs["flows"]
+                if self.get_backward:
+                    inputs["flows_b"] = 2 * inputs["flows_b"]
 
-        inputs["flows"] = rearrange(
-            inputs["flows"], "b c (h nh) (w nw) -> b (nh nw) c h w", nh=2, nw=2
-        )
-        inputs["valids"] = inputs["valids"][:, :, ::2, ::2]
+                process_keys = [("flows", "valids")]
+                if self.get_backward:
+                    process_keys.append(("flows_b", "valids_b"))
+
+                for flow_key, valid_key in process_keys:
+                    flow = inputs[flow_key]
+                    flow_stack = rearrange(
+                        flow, "b c (h nh) (w nw) -> b (nh nw) c h w", nh=2, nw=2
+                    )
+                    flow_stack4 = flow_stack.repeat(1, 4, 1, 1, 1)
+                    flow_stack4 = rearrange(
+                        flow_stack4, "b (m n) c h w -> b m n c h w", m=4
+                    )
+                    diff = flow_stack[:, :, None] - flow_stack4
+                    diff = rearrange(diff, "b m n c h w -> b (m n) c h w")
+                    diff = torch.sqrt(torch.pow(diff, 2).sum(2))
+                    max_diff, _ = diff.max(1)
+                    max_diff = F.interpolate(
+                        max_diff[:, None], scale_factor=2, mode="nearest"
+                    )
+                    inputs[valid_key] = (max_diff < 1.0).float()
+        else:
+            if self.transform is not None:
+                inputs = self.transform(inputs)
+
+            if "flows" in inputs:
+                inputs["flows"] = rearrange(
+                    inputs["flows"], "b c (h nh) (w nw) -> b (nh nw) c h w", nh=2, nw=2
+                )
+                inputs["valids"] = inputs["valids"][:, :, ::2, ::2]
+                if self.get_backward:
+                    inputs["flows_b"] = rearrange(
+                        inputs["flows_b"],
+                        "b c (h nh) (w nw) -> b (nh nw) c h w",
+                        nh=2,
+                        nw=2,
+                    )
+                    inputs["valids_b"] = inputs["valids_b"][:, :, ::2, ::2]
 
         if self.get_meta:
             inputs["meta"] = {
@@ -1930,7 +1979,7 @@ class TartanAirDataset(BaseFlowDataset):
         sequence_length: int = 2,
         sequence_position: str = "first",
     ) -> None:
-        """Initialize SintelDataset.
+        """Initialize TartanAirDataset.
 
         Parameters
         ----------
@@ -1959,7 +2008,8 @@ class TartanAirDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         if isinstance(difficulties, str):
             difficulties = [difficulties]
@@ -2009,7 +2059,13 @@ class TartanAirDataset(BaseFlowDataset):
                             occ_paths, sequence_length, sequence_position
                         )
                         assert len(occ_paths) == len(flow_paths)
-                    for i in range(len(image_paths) - self.sequence_length + 1):
+
+                    step_size = (
+                        (self.sequence_length - 1) if sequence_position == "all" else 1
+                    )
+                    for i in range(
+                        0, len(image_paths) - self.sequence_length + 1, step_size
+                    ):
                         self.img_paths.append(image_paths[i : i + self.sequence_length])
                         if len(flow_paths) > 0:
                             self.flow_paths.append(
@@ -2129,7 +2185,6 @@ class MiddleburyDataset(BaseFlowDataset):
                         "is_val": False,
                         "misc": seq_name,
                         "is_seq_start": True,
-                        "is_seq_end": True,
                     }
                 )
 
@@ -2138,6 +2193,76 @@ class MiddleburyDataset(BaseFlowDataset):
             assert len(self.img_paths) == len(
                 self.flow_paths
             ), f"{len(self.img_paths)} vs {len(self.flow_paths)}"
+
+        self._log_status()
+
+
+class MiddleburySTDataset(BaseFlowDataset):
+    """Handle the Middlebury-ST dataset."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_meta: bool = True,
+    ) -> None:
+        """Initialize MiddleburySTDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the Middlebury dataset.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_meta : bool, default True
+            Whether to get metadata.
+        """
+        super().__init__(
+            dataset_name="MiddleburyST",
+            split_name="trainval",
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=False,
+            get_meta=get_meta,
+        )
+        self.root_dir = root_dir
+        self.sequence_length = 2
+        self.is_two_file_flow = True
+
+        sequence_names = sorted(
+            [p.stem for p in Path(self.root_dir).glob("*") if p.is_dir()]
+        )
+
+        # Read paths from disk
+        for seq_name in sequence_names:
+            image_paths = [
+                Path(self.root_dir) / seq_name / "im0.png",
+                Path(self.root_dir) / seq_name / "im1.png",
+            ]
+            self.img_paths.append(image_paths)
+            disp_paths = [
+                Path(self.root_dir) / seq_name / "disp0.pfm",
+                Path(self.root_dir) / seq_name / "disp0y.pfm",
+            ]
+            self.flow_paths.append([disp_paths])
+            self.metadata.append(
+                {
+                    "image_paths": [str(p) for p in image_paths],
+                    "is_val": False,
+                    "misc": seq_name,
+                    "is_seq_start": True,
+                }
+            )
 
         self._log_status()
 
@@ -2190,7 +2315,8 @@ class MonkaaDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name="Monkaa",
@@ -2261,7 +2387,14 @@ class MonkaaDataset(BaseFlowDataset):
                                 flow_b_paths, sequence_length, sequence_position
                             )
 
-                        for i in range(len(image_paths) - self.sequence_length + 1):
+                        step_size = (
+                            (self.sequence_length - 1)
+                            if sequence_position == "all"
+                            else 1
+                        )
+                        for i in range(
+                            0, len(image_paths) - self.sequence_length + 1, step_size
+                        ):
                             self.img_paths.append(
                                 image_paths[i : i + self.sequence_length]
                             )
@@ -2280,8 +2413,6 @@ class MonkaaDataset(BaseFlowDataset):
                                     "is_val": False,
                                     "misc": "",
                                     "is_seq_start": i == 0,
-                                    "is_seq_end": i
-                                    == (len(image_paths) - self.sequence_length),
                                 }
                             )
                             if self.get_backward:
@@ -2326,13 +2457,14 @@ class KubricDataset(BaseFlowDataset):
         get_meta: bool = True,
         sequence_length: int = 2,
         sequence_position: str = "first",
+        max_seq: Optional[int] = None,
     ) -> None:
         """Initialize KubricDataset.
 
         Parameters
         ----------
         root_dir : str
-            path to the root directory of the MPI Sintel dataset.
+            path to the root directory of the Kubric dataset.
         transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
             Transform to be applied on the inputs.
         max_flow : float, default 10000.0
@@ -2352,7 +2484,8 @@ class KubricDataset(BaseFlowDataset):
             Determines the position where the main image frame will be in the sequence. It can one of three values:
             - "first": the main frame will be the first one of the sequence,
             - "middle": the main frame will be in the middle of the sequence (at position sequence_length // 2),
-            - "last": the main frame will be the penultimate in the sequence.
+            - "last": the main frame will be the penultimate in the sequence,
+            - "all": all the frames are considered the main. The next sequence will start from the last frame in the last sequence plus one.
         """
         super().__init__(
             dataset_name=f"Kubric",
@@ -2371,9 +2504,7 @@ class KubricDataset(BaseFlowDataset):
         self.flow_format = "kubric_png"
 
         sequence_dirs = sorted([p for p in (Path(root_dir)).glob("*") if p.is_dir()])
-
-        self.flow_read_mins = []
-        self.flow_read_maxs = []
+        sequence_dirs = sequence_dirs[:max_seq]
 
         for seq_dir in sequence_dirs:
             seq_name = seq_dir.name
@@ -2385,37 +2516,31 @@ class KubricDataset(BaseFlowDataset):
             flow_paths = self._extend_paths_list(
                 flow_paths, sequence_length, sequence_position
             )
+            flow_paths = [(p, "forward_flow") for p in flow_paths]
             assert len(image_paths) - 1 == len(
                 flow_paths
             ), f"{seq_name}: {len(image_paths)-1} vs {len(flow_paths)}"
-
-            with open(seq_dir / "data_ranges.json", "r") as f:
-                data_ranges = json.load(f)
 
             if get_backward:
                 back_flow_paths = sorted(seq_dir.glob("backward_flow_*.png"))[1:]
                 back_flow_paths = self._extend_paths_list(
                     back_flow_paths, sequence_length, sequence_position
                 )
+                back_flow_paths = [(p, "backward_flow") for p in back_flow_paths]
                 assert len(image_paths) - 1 == len(
                     back_flow_paths
                 ), f"{seq_name}: {len(image_paths)-1} vs {len(back_flow_paths)}"
-                self.flow_b_read_mins = []
-                self.flow_b_read_maxs = []
 
-            for i in range(len(image_paths) - self.sequence_length + 1):
+            step_size = (self.sequence_length - 1) if sequence_position == "all" else 1
+            for i in range(0, len(image_paths) - self.sequence_length + 1, step_size):
                 self.img_paths.append(image_paths[i : i + self.sequence_length])
                 if len(flow_paths) > 0:
                     self.flow_paths.append(flow_paths[i : i + self.sequence_length - 1])
-                self.flow_read_mins.append(data_ranges["forward_flow"]["min"])
-                self.flow_read_maxs.append(data_ranges["forward_flow"]["max"])
 
                 if get_backward:
                     self.flow_b_paths.append(
                         back_flow_paths[i : i + self.sequence_length - 1]
                     )
-                    self.flow_b_read_mins.append(data_ranges["backward_flow"]["min"])
-                    self.flow_b_read_maxs.append(data_ranges["backward_flow"]["max"])
 
                 self.metadata.append(
                     {
@@ -2427,5 +2552,99 @@ class KubricDataset(BaseFlowDataset):
                         "is_seq_start": i == 0,
                     }
                 )
+
+        self._log_status()
+
+
+class ViperDataset(BaseFlowDataset):
+    """Handle the Viper dataset."""
+
+    def __init__(  # noqa: C901
+        self,
+        root_dir: str,
+        split: str = "train",
+        transform: Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]] = None,
+        max_flow: float = 10000.0,
+        get_valid_mask: bool = True,
+        get_meta: bool = True,
+    ) -> None:
+        """Initialize ViperDataset.
+
+        Parameters
+        ----------
+        root_dir : str
+            path to the root directory of the Middlebury dataset.
+        split : str, default 'train'
+            Which split of the dataset should be loaded. It can be one of {'train', 'val', 'trainval'}.
+        transform : Callable[[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]], optional
+            Transform to be applied on the inputs.
+        max_flow : float, default 10000.0
+            Maximum optical flow absolute value. Flow absolute values that go over this limit are clipped, and also marked
+            as zero in the valid mask.
+        img_extension : str
+            Extension of the image file. It can be one of {'jpg', 'png'}.
+        get_valid_mask : bool, default True
+            Whether to get or generate valid masks.
+        get_meta : bool, default True
+            Whether to get metadata.
+        """
+        super().__init__(
+            dataset_name="VIPER",
+            split_name=split,
+            transform=transform,
+            max_flow=max_flow,
+            get_valid_mask=get_valid_mask,
+            get_occlusion_mask=False,
+            get_motion_boundary_mask=False,
+            get_backward=False,
+            get_meta=get_meta,
+        )
+        self.root_dir = root_dir
+        self.sequence_length = 2
+
+        self.flow_format = "viper_npz"
+
+        if split == "trainval":
+            split_dirs = ["train", "val"]
+        else:
+            split_dirs = [split]
+
+        for spdir in split_dirs:
+            img_dir_path = Path(self.root_dir) / spdir / "img"
+            flow_dir_path = Path(self.root_dir) / spdir / "flow"
+
+            sequence_names = sorted(
+                [p.stem for p in img_dir_path.glob("*") if p.is_dir()]
+            )
+
+            # Read paths from disk
+            for seq_name in sequence_names:
+                if flow_dir_path.exists():
+                    flow_paths = sorted(list((flow_dir_path / seq_name).glob(f"*.npz")))
+                    for fpath in flow_paths:
+                        file_idx = int(fpath.stem.split("_")[1])
+                        img1_path = (
+                            img_dir_path / seq_name / f"{seq_name}_{(file_idx):05d}.png"
+                        )
+                        img2_path = (
+                            img_dir_path
+                            / seq_name
+                            / f"{seq_name}_{(file_idx + 1):05d}.png"
+                        )
+                        if img1_path.exists() and img2_path.exists():
+                            self.img_paths.append([img1_path, img2_path])
+                            self.flow_paths.append([fpath])
+                            self.metadata.append(
+                                {
+                                    "image_paths": [
+                                        str(p) for p in [img1_path, img2_path]
+                                    ],
+                                    "is_val": spdir == "val",
+                                    "misc": seq_name,
+                                    "is_seq_start": True,
+                                }
+                            )
+                else:
+                    raise NotImplementedError()
 
         self._log_status()

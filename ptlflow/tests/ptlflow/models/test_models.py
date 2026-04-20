@@ -17,10 +17,10 @@
 from pathlib import Path
 import shutil
 
+from jsonargparse import ArgumentParser
+import lightning.pytorch as pl
 import pandas as pd
 import pytest
-
-import lightning.pytorch as pl
 import torch
 
 import ptlflow
@@ -35,11 +35,12 @@ DATASET = "overfit"
 EXCLUDE_MODELS = [
     "matchflow",
     "matchflow_raft",
-    "neuflow",  # requires torch 2.X
     "scv4",
     "scv8",
     "separableflow",
     "splatflow",
+    "streamflow",
+    "waft_dinov3_a2",
 ]  # Has additional requirements
 
 EXCLUDE_MODELS_FP16 = [
@@ -47,19 +48,20 @@ EXCLUDE_MODELS_FP16 = [
     "lcv_raft_small",
     "matchflow",
     "matchflow_raft",
-    "neuflow",  # requires torch 2.X
     "scv4",
     "scv8",
     "separableflow",
     "splatflow",
+    "streamflow",
+    "waft_dinov3_a2",
 ]  # Some operations do not support fp16
 
 MODEL_ARGS = {
     "ccmr": {"alternate_corr": False},
-    "ccmr+": {"alternate_corr": False},
+    "ccmr_p": {"alternate_corr": False},
     "flowformer": {"use_tile_input": False},
-    "flowformer++": {"use_tile_input": False},
-    "ms_raft+": {"alternate_corr": False},
+    "flowformer_pp": {"use_tile_input": False},
+    "ms_raft_p": {"alternate_corr": False},
     "rapidflow": {"corr_mode": "allpairs"},
     "rapidflow_it1": {"corr_mode": "allpairs"},
     "rapidflow_it2": {"corr_mode": "allpairs"},
@@ -71,26 +73,30 @@ MODEL_ARGS = {
 
 
 def test_forward() -> None:
-    model_names = ptlflow.models_dict.keys()
+    model_names = ptlflow._models_dict.keys()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
 
         print(mname)
         model_ref = ptlflow.get_model_reference(mname)
-        parser = model_ref.add_model_specific_args()
+        parser = ArgumentParser()
+        parser.add_class_arguments(model_ref, "model")
         args = parser.parse_args([])
 
         if mname in MODEL_ARGS:
             for name, val in MODEL_ARGS[mname].items():
-                setattr(args, name, val)
+                setattr(args.model, name, val)
 
         model = ptlflow.get_model(mname, args=args)
         model = model.eval()
 
-        s = make_divisible(256, model.output_stride)
+        out_stride = model.output_stride
+        if out_stride is None:
+            out_stride = 64
+        s = make_divisible(256, out_stride)
         num_images = 2
-        if mname in ["videoflow_bof", "videoflow_mof"]:
+        if mname in ["videoflow_bof", "videoflow_mof", "memfof"]:
             num_images = 3
         inputs = {"images": torch.rand(1, num_images, 3, s, s)}
 
@@ -103,14 +109,15 @@ def test_forward() -> None:
 
 def test_forward_fp16() -> None:
     if torch.cuda.is_available():
-        model_names = ptlflow.models_dict.keys()
+        model_names = ptlflow._models_dict.keys()
         for mname in model_names:
             if mname in EXCLUDE_MODELS_FP16:
                 continue
 
             print(mname)
             model_ref = ptlflow.get_model_reference(mname)
-            parser = model_ref.add_model_specific_args()
+            parser = ArgumentParser()
+            parser.add_class_arguments(model_ref, "model")
             args = parser.parse_args([])
 
             if mname in MODEL_ARGS:
@@ -121,9 +128,12 @@ def test_forward_fp16() -> None:
             model = model.eval()
             model = model.half()
 
-            s = make_divisible(256, model.output_stride)
+            out_stride = model.output_stride
+            if out_stride is None:
+                out_stride = 64
+            s = make_divisible(256, out_stride)
             num_images = 2
-            if mname in ["videoflow_bof", "videoflow_mof"]:
+            if mname in ["videoflow_bof", "videoflow_mof", "memfof"]:
                 num_images = 3
             inputs = {"images": torch.rand(1, num_images, 3, s, s)}
 
@@ -140,7 +150,7 @@ def test_forward_fp16() -> None:
 def test_train(tmp_path: Path):
     write_flying_chairs2(tmp_path)
 
-    model_names = ptlflow.models_dict.keys()
+    model_names = ptlflow._models_dict.keys()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue
@@ -181,7 +191,7 @@ def _train_one_pass(tmp_path: Path, model_name: str) -> None:
 def test_overfit(tmp_path: Path) -> None:
     print("Saving outputs to " + str(tmp_path))
 
-    model_names = ptlflow.models_dict.keys()
+    model_names = ptlflow._models_dict.keys()
     for mname in model_names:
         if mname in EXCLUDE_MODELS:
             continue

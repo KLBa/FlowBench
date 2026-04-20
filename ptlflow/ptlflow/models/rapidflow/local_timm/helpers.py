@@ -1,7 +1,8 @@
-""" Model creation / weight loading / state_dict helpers
+"""Model creation / weight loading / state_dict helpers
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
+
 from itertools import chain
 
 import torch

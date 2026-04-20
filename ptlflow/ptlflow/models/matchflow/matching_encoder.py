@@ -289,11 +289,10 @@ class PositionEncodingSineNorm(nn.Module):
 
 
 class MatchingModel(nn.Module):
-    def __init__(self, cfg, train_size=(384, 512)):
+    def __init__(self, train_size=(384, 512)):
         super().__init__()
-        self.cfg = cfg
         self.image_size = train_size
-        self.backbone = ResNetFPN_8_2(cfg)
+        self.backbone = ResNetFPN_8_2()
 
         self.pos_encoding = PositionEncodingSineNorm(256)
 
@@ -321,7 +320,7 @@ class MatchingModel(nn.Module):
         feats_c = self.backbone(x)
         B, _, H, W = feats_c.shape
 
-        (feat_c0, feat_c1) = feats_c.split(B // 2)
+        feat_c0, feat_c1 = feats_c.split(B // 2)
 
         # 2. coarse-level loftr module
         if self.training:

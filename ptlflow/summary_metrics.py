@@ -42,7 +42,7 @@ def _init_parser() -> argparse.ArgumentParser:
         "--chosen_metrics",
         type=str,
         nargs="+",
-        default=("epe", "outlier"),
+        default=("epe", "flall"),
         help=(
             "Names of which metrics to keep in the summarized results. The chosen names must be at the end of the column "
             "name of the csv file. If exactly two metrics are chosen, a plot between the two will also be generated."
@@ -79,6 +79,11 @@ def _init_parser() -> argparse.ArgumentParser:
             "Name of checkpoints to not be included in the final outputs. The names must be substrings of the values in "
             "the file from --metrics_path."
         ),
+    )
+    parser.add_argument(
+        "--save_plots",
+        action="store_true",
+        default=None,
     )
 
     return parser
@@ -207,7 +212,7 @@ def summarize(args: argparse.Namespace) -> None:
     with open(args.output_dir / f"{file_name}.md", "w") as f:
         df.to_markdown(f)
 
-    if len(args.chosen_metrics) == 2:
+    if args.save_plots and len(args.chosen_metrics) == 2:
         save_plots(args, df)
 
 
