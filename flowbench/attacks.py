@@ -16,11 +16,12 @@
 # limitations under the License.
 # =============================================================================
 
+from argparse import ArgumentTypeError
 import pdb
 import ast
 import logging
 import sys
-from argparse import ArgumentParser, Namespace
+from jsonargparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -34,17 +35,10 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from loguru import logger
 
-from ptlflow import get_model, get_model_reference
-from ptlflow.models.base_model.base_model import BaseModel
-from ptlflow.utils import flow_utils
-from ptlflow.utils.io_adapter import IOAdapter
-from ptlflow.utils.utils import (
-    add_datasets_to_parser,
-    config_logging,
-    get_list_of_available_models_list,
-    tensor_dict_to_numpy,
-)
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # adds project root
 
 from attacks.fgsm import fgsm
 from attacks.apgd import apgd
@@ -67,6 +61,19 @@ import torch.nn as nn
 from torch.nn.functional import cosine_similarity
 from attacks.attack_utils.utils import get_flow_tensors, get_image_tensors
 
+from ptlflow import get_model, get_model_reference, restore_model
+from ptlflow.utils.registry import RegisteredModel
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from ptlflow.data.flow_datamodule import FlowDataModule
+from ptlflow.utils.flow_metrics import FlowMetrics
+from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.utils import flow_utils
+from ptlflow.utils.io_adapter import IOAdapter
+from ptlflow.utils.utils import (
+    config_logging,
+    get_list_of_available_models_list,
+    tensor_dict_to_numpy,
+)
 
 # Default Attack parameters
 epsilon = 8 / 255
@@ -85,18 +92,33 @@ config_logging()
 # import os
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:100"
 
+def bool_or_rgb(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v == "false":
+            return False
+        if v == "true":
+            return True
+        # Try parsing as RGB tuple
+        rgb = ast.literal_eval(value)
+        if isinstance(rgb, (list, tuple)) and len(rgb) == 3:
+            return rgb
+    raise ArgumentTypeError(f"Expected bool or RGB tuple, got: {value}")
 
 def _init_parser() -> ArgumentParser:
-    parser = ArgumentParser()
+    parser = ArgumentParser(add_help=False)
     parser.add_argument(
-        "--model",
-        choices=get_list_of_available_models_list(),
-        help="Name of the model to use.",
+        "--ckpt_path",
+        type=str,
+        default=None,
+        help=("Path to a ckpt file for the chosen model."),
     )
     parser.add_argument(
         "--attack",
         type=str,
-        default="none",
+        default=["none"],
         nargs="*",
         choices=[
             "fgsm",
@@ -117,7 +139,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--attack_optim_target",
         type=str,
-        default="ground_truth",
+        default=["ground_truth"],
         nargs="*",
         choices=["ground_truth", "initial_flow"],
         help="Set optimization target for adversarial attacks.",
@@ -125,7 +147,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--cc_name",
         type=str,
-        default="gaussian_noise",
+        default=["gaussian_noise"],
         nargs="*",
         choices=[
             "gaussian_noise",
@@ -149,7 +171,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--cc_severity",
         type=int,
-        default=1,
+        default=[1],
         nargs="*",
         choices=[1, 2, 3, 4, 5],
         help="Severity of the common corruption to use on the input images.",
@@ -157,7 +179,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--attack_norm",
         type=str,
-        default=norm,
+        default=[norm],
         nargs="*",
         choices=["two", "inf"],
         help="Set norm to use for adversarial attack.",
@@ -165,13 +187,13 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--attack_epsilon",
         type=float,
-        default=epsilon,
+        default=[epsilon],
         nargs="*",
         help="Set epsilon to use for adversarial attack.",
     )
     parser.add_argument(
         "--pcfa_boxconstraint",
-        default="change_of_variables",
+        default=["change_of_variables"],
         nargs="*",
         choices=["clipping", "change_of_variables"],
         help="the way to enfoce the box constraint on the distortion. Options: 'clipping', 'change_of_variables'.",
@@ -199,35 +221,35 @@ def _init_parser() -> ArgumentParser:
     # )
     parser.add_argument(
         "--apgd_rho",
-        default=0.75,
+        default=[0.75],
         nargs="*",
         type=float,
         help="parameter for step-size update (Default: 0.75)",
     )
     parser.add_argument(
         "--apgd_n_restarts",
-        default=1,
+        default=[1],
         nargs="*",
         type=int,
         help="number of random restarts. (Default: 1)",
     )
     parser.add_argument(
         "--apgd_eot_iter",
-        default=1,
+        default=[1],
         nargs="*",
         type=int,
         help="number of iteration for EOT. (Default: 1)",
     )
     parser.add_argument(
         "--apgd_seed",
-        default=0,
+        default=[0],
         nargs="*",
         type=int,
         help="random seed for the starting point. (Default: 0)",
     )
     parser.add_argument(
         "--apgd_steps",
-        default=10,
+        default=[10],
         nargs="*",
         type=int,
         help="number of steps. (Default: 10)",
@@ -235,7 +257,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--attack_iterations",
         type=int,
-        default=iterations,
+        default=[iterations],
         nargs="*",
         help="Set number of iterations for adversarial attack.",
     )
@@ -248,14 +270,14 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--attack_targeted",
         type=attack_targeted_string,
-        default=targeted,
+        default=[targeted],
         nargs="*",
         help="Set if adversarial attack should be targeted.",
     )
     parser.add_argument(
         "--attack_target",
         type=str,
-        default="zero",
+        default=["zero"],
         nargs="*",
         choices=["zero", "negative"],
         help="Set the target for a tagreted attack.",
@@ -263,7 +285,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--attack_loss",
         type=str,
-        default="epe",
+        default=["epe"],
         nargs="*",
         help="Set the name of the used loss function (mse, epe)",
     )
@@ -271,14 +293,14 @@ def _init_parser() -> ArgumentParser:
         "--tdcc_intensity",
         type=int,
         choices=[1, 2, 3, 4, 5],
-        default=3,
+        default=[3],
         nargs="*",
         help="Set the the intensity of the 3DCC corruption, int between 1 and 5",
     )
     parser.add_argument(
         "--tdcc_corruption",
         type=str,
-        default="far_focus",
+        default=["far_focus"],
         nargs="*",
         choices=[
             "far_focus",
@@ -407,32 +429,32 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--weather_steps",
         type=int,
-        default=750,
+        default=[750],
         nargs="*",
         help="the number of optimization steps per image.",
     )
     parser.add_argument(
         "--weather_learn_offset",
         default=True,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="if specified, initial position of the particles will be optimized.",
     )
     parser.add_argument(
         "--weather_learn_motionoffset",
         default=True,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="if specified, the endpoint of the particle motion will be optimized (along with the starting point).",
     )
     parser.add_argument(
         "--weather_learn_color",
         default=True,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="if specified, the color of the particle will be optimized.",
     )
     parser.add_argument(
         "--weather_learn_transparency",
         default=True,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="if specified, the transparency of the particles will be optimized.",
     )
     parser.add_argument(
@@ -454,7 +476,7 @@ def _init_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--weather_dataset",
-        default="Sintel",
+        default=["Sintel"],
         nargs="*",
         help="specify the dataset which should be used for evaluation",
     )
@@ -479,13 +501,13 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--weather_depth_check",
         default=False,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="if specified, particles will not be rendered if behind an object.",
     )
     parser.add_argument(
         "--weather_depth_check_differentiable",
-        type=ast.literal_eval,
-        default=False,
+        type=bool_or_rgb,
+        default=[False],
         nargs="*",
         help="if specified, the rendering check for particle occlusion by objects is included into the compute graph.",
     )
@@ -498,13 +520,13 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--weather_recolor",
         default=False,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="If specified, all weather is recolored with the given r,g,b value (no variations).",
     )
     parser.add_argument(
         "--weather_do_motionblur",
         default=True,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="control if particles are rendered with motion blur (default=True).",
     )
     parser.add_argument(
@@ -601,7 +623,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--weather_no_flake_dat",
         default=True,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="if this flag is used, no data about the particle (positions, flakes, transparencies) will be stored.",
     )
     parser.add_argument(
@@ -613,7 +635,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--weather_unregistered_artifacts",
         default=True,
-        type=ast.literal_eval,
+        type=bool_or_rgb,
         help="if True, artifacts are saved to the output folder but not registered. Saves time and memory during training.",
     )
     parser.add_argument('--weather_num_flakes', default=1000, type=int,
@@ -621,7 +643,7 @@ def _init_parser() -> ArgumentParser:
     return parser
 
 
-def attack(args: Namespace, model: BaseModel) -> pd.DataFrame:
+def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> pd.DataFrame:
     """Perform the validation.
 
     Parameters
@@ -645,20 +667,21 @@ def attack(args: Namespace, model: BaseModel) -> pd.DataFrame:
         model = model.cuda()
         if args.fp16:
             model = model.half()
-    dataloaders = model.val_dataloader()
+    data_module.setup("validate")
+    dataloaders = data_module.val_dataloader()
     dataloaders = {
-        model.val_dataloader_names[i]: dataloaders[i] for i in range(len(dataloaders))
+        data_module.val_dataloader_names[i]: dataloaders[i] for i in range(len(dataloaders))
     }
     overwrite_flag = args.overwrite_output
     output_data = []
     iteration_data = []
     start_time = datetime.now()
     output_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
-    output_data.append(("model", args.model))
-    output_data.append(("checkpoint", args.pretrained_ckpt))
+    output_data.append(("model", args.model.class_path.split('.')[-1]))
+    output_data.append(("checkpoint", args.ckpt_path))
     iteration_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
     iteration_data.append(("model", args.model))
-    iteration_data.append(("checkpoint", args.pretrained_ckpt))
+    iteration_data.append(("checkpoint", args.ckpt_path))
     attack_args_parser = AttackArgumentParser(args)
 
     for attack_args in attack_args_parser:
@@ -669,7 +692,7 @@ def attack(args: Namespace, model: BaseModel) -> pd.DataFrame:
                 value = round(value, 4)
             output_data.append((key, value))
             iteration_data.append((key, value))
-        print(attack_args)
+        logger.info(f"Attack arguments: {attack_args}")
         for dataset_name, dl in dataloaders.items():
             metrics_mean, iteration_metrics_mean = attack_one_dataloader(
                 args, attack_args, model, dl, dataset_name
@@ -701,7 +724,7 @@ def attack(args: Namespace, model: BaseModel) -> pd.DataFrame:
                     output_dict.setdefault("metrics", {})[key.split("/")[1]] = value
                 else:
                     output_dict[key] = value
-            output_filename = args.output_path / f"metrics_{args.val_dataset}.json"
+            output_filename = args.output_path / f"metrics_{args.data.val_dataset}.json"
 
             if os.path.exists(output_filename) and not overwrite_flag:
                 with open(output_filename, "r") as json_file:
@@ -765,6 +788,11 @@ def attack_one_dataloader(
     Dict[str, float]
         The average metric values for this dataloader.
     """
+    if len(model.val_metrics) == 0:
+        model.val_metrics.append(FlowMetrics(prefix="val/"))
+    else:
+        logger.warning("Model has pre-defined val_metrics. That's suspicious.")
+
     metrics_sum = {}
     iteration_metrics_sum = {}
     if attack_args["attack"] == "weather":
@@ -779,7 +807,7 @@ def attack_one_dataloader(
         )
     metrics_individual = None
     if args.write_individual_metrics:
-        metrics_individual = {"filename": [], "epe": [], "outlier": []}
+        metrics_individual = {"filename": [], "epe": [], "flall": []}
 
     with tqdm(dataloader) as tdl:
         prev_preds = None
@@ -926,7 +954,7 @@ def attack_one_dataloader(
 
             if attack_args["attack_targeted"] or attack_args["attack"] == "pcfa":
 
-                metrics = model.val_metrics(preds, targeted_inputs)
+                metrics = model.val_metrics[0](preds, targeted_inputs)
 
                 criterion = LossCriterion("epe")
                 loss = criterion.loss(
@@ -936,7 +964,7 @@ def attack_one_dataloader(
                 loss = loss.mean()
                 metrics["val/own_epe"] = loss
 
-                metrics_orig_preds = model.val_metrics(preds, orig_preds)
+                metrics_orig_preds = model.val_metrics[0](preds, orig_preds)
                 metrics["val/epe_orig_preds"] = metrics_orig_preds["val/epe"]
 
                 loss = criterion.loss(
@@ -957,7 +985,7 @@ def attack_one_dataloader(
                     )
                 )
                 if has_ground_truth:
-                    metrics_ground_truth = model.val_metrics(preds, inputs)
+                    metrics_ground_truth = model.val_metrics[0](preds, inputs)
                     metrics["val/epe_ground_truth"] = metrics_ground_truth["val/epe"]
 
                     loss = criterion.loss(
@@ -973,7 +1001,7 @@ def attack_one_dataloader(
                         )
                     )
             else:
-                metrics = model.val_metrics(preds, inputs)
+                metrics = model.val_metrics[0](preds, inputs)
 
                 criterion = LossCriterion("epe")
                 loss = criterion.loss(
@@ -1020,7 +1048,7 @@ def attack_one_dataloader(
 
                     targeted_inputs["flows"] = targeted_flow_tensor_negative.float()
 
-                    metrics_ground_truth_negative = model.val_metrics(
+                    metrics_ground_truth_negative = model.val_metrics[0](
                         targeted_inputs, inputs
                     )
                     metrics["val/epe_ground_truth_to_negative"] = (
@@ -1028,7 +1056,7 @@ def attack_one_dataloader(
                     )
 
                     targeted_inputs["flows"] = targeted_flow_tensor_zero.float()
-                    metrics_ground_truth_zero = model.val_metrics(
+                    metrics_ground_truth_zero = model.val_metrics[0](
                         targeted_inputs, inputs
                     )
                     metrics["val/epe_ground_truth_to_zero"] = metrics_ground_truth_zero[
@@ -1056,7 +1084,7 @@ def attack_one_dataloader(
             free, total = torch.cuda.mem_get_info()
             tdl.set_postfix(
                 epe=metrics_sum["val/epe"] / (i + 1),
-                outlier=metrics_sum["val/outlier"] / (i + 1),
+                flall=metrics_sum["val/flall"] / (i + 1),
                 total=total,
                 free=free,
             )
@@ -1069,7 +1097,7 @@ def attack_one_dataloader(
             if metrics_individual is not None:
                 metrics_individual["filename"].append(filename)
                 metrics_individual["epe"].append(metrics["val/epe"].item())
-                metrics_individual["outlier"].append(metrics["val/outlier"].item())
+                metrics_individual["flall"].append(metrics["val/flall"].item())
 
             if attack_args["attack"] != "none" and attack_args["attack"] != "3dcc":
                 generate_outputs(
@@ -1106,7 +1134,7 @@ def attack_one_dataloader(
         ind_df = pd.DataFrame(metrics_individual)
         args.output_path.mkdir(parents=True, exist_ok=True)
         ind_df.to_csv(
-            Path(args.output_path) / f"{dataloader_name}_epe_outlier.csv", index=None
+            Path(args.output_path) / f"{dataloader_name}_epe_flall.csv", index=None
         )
 
     metrics_mean = {}
@@ -1288,28 +1316,35 @@ def _write_to_file(
 
 if __name__ == "__main__":
     parser = _init_parser()
+    
+    cli = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        datamodule_class=FlowDataModule,
+        parser_kwargs={'parents': [parser]},
+        run=False,
+        parse_only=False,
+        auto_configure_optimizers=False,
+    )
 
-    # TODO: It is ugly that the model has to be gotten from the argv rather than the argparser.
-    # However, I do not see another way, since the argparser requires the model to load some of the args.
-    FlowModel = None
-    if len(sys.argv) > 1 and sys.argv[1] not in ["-h", "--help", "all", "select"]:
-        FlowModel = get_model_reference(sys.argv[1])
-        parser = FlowModel.add_model_specific_args(parser)
+    cfg = cli.config
+    cfg.model_name = cfg.model.class_path.split(".")[-1]
+    model_id = cfg.model_name
 
-    add_datasets_to_parser(parser, "./ptlflow/datasets.yaml")
+    if cfg.ckpt_path is not None:
+        model_id += f"_{Path(cfg.ckpt_path).stem}"
+    if cfg.max_forward_side is not None:
+        model_id += f"_maxside{cfg.max_forward_side}"
+    if cfg.scale_factor is not None:
+        model_id += f"_scale{cfg.scale_factor}"
+    if cfg.model.init_args.warm_start:
+        model_id += f"_warm"
+    cfg.output_path = Path(cfg.output_path) / model_id
+    Path(cfg.output_path).mkdir(parents=True, exist_ok=True)
 
-    args = parser.parse_args()
+    logger.info("The outputs will be saved to {}.", cfg.output_path)
 
-    if args.model not in ["all", "select"]:
-        model_id = args.model
-        if args.pretrained_ckpt is not None:
-            model_id += f"_{Path(args.pretrained_ckpt).stem}"
-        if args.max_forward_side is not None:
-            model_id += f"_maxside{args.max_forward_side}"
-        if args.scale_factor is not None:
-            model_id += f"_scale{args.scale_factor}"
-        args.output_path = Path(args.output_path) / model_id
-        model = get_model(sys.argv[1], args.pretrained_ckpt, args)
-        args.output_path.mkdir(parents=True, exist_ok=True)
-
-        attack(args, model)
+    model = cli.model
+    model = restore_model(model, cfg.ckpt_path)
+    
+    metrics_df = attack(cfg, model, cli.datamodule)

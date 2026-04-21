@@ -70,7 +70,7 @@ from attacks.attack_utils.attack_args_parser import (
 )
 import attacks.attack_utils.loss_criterion as losses
 from attacks.attack_utils.loss_criterion import LossCriterion
-from validate import (
+from _ptlflow.validate import (
     _get_model_names,
 )
 
@@ -1162,9 +1162,9 @@ if __name__ == "__main__":
     cfg.output_path = Path(cfg.output_path) / model_id
     Path(cfg.output_path).mkdir(parents=True, exist_ok=True)
 
-    # logger.info("The outputs will be saved to {}.", cfg.output_path)
+    logger.info("The outputs will be saved to {}.", cfg.output_path)
 
     model = cli.model
     model = restore_model(model, cfg.ckpt_path)
     
-    metrics_df = attack(cfg, model, cli.datamodule) # , datamodule)
+    metrics_df = attack(cfg, model, cli.datamodule)
