@@ -1,3 +1,3 @@
 [submodule "ptlflow"]
-	path = ptlflow
+	path = _ptlflow
 	url = git@github.com:hmorimitsu/ptlflow.git
