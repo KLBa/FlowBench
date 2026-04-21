@@ -14,7 +14,7 @@ echo "Installing spatial-correlation-sampler from GitHub..."
 python -m pip install git+https://github.com/ClementPinard/Pytorch-Correlation-extension.git
 
 echo "Installing local ptlflow package..."
-cd ptlflow
+cd _ptlflow
 python -m pip install .
 
 echo "Installing alt_cuda_corr extensiocondn..."
