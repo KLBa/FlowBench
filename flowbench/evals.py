@@ -1,4 +1,5 @@
 import os
+from jsonargparse import Namespace
 import pandas as pd
 import math
 
@@ -7,7 +8,7 @@ from ptlflow.utils.utils import get_list_of_available_models_list
 from pathlib import Path
 
 from .attacks import attack
-from .utils import get_args_parser, get_pretrained_ckpt, get_results
+from .utils import get_default_cli, get_pretrained_ckpt, get_results
 
 
 common_corruptions_2d = [
@@ -58,34 +59,14 @@ def evaluate(
     lp_norm: str = 'Linf', targeted: bool = True, target: str = 'zero', optim_wrt: str = 'ground_truth',
     weather: str = 'snow', num_particles: int = 10000,
     severity: int = 3,
-    # WeatherConfig parameters
-    attack_loss: str = "epe",
-    weather_scene_scale: float = 1.0,
-    weather_data: str = "datasets/adv_weather_data/weather_particles_red",
-    weather_model_iters: int = 32,
-    weather_steps: int = 750,
-    weather_learn_offset: bool = True,
-    weather_learn_motionoffset: bool = True,
-    weather_learn_color: bool = True,
-    weather_learn_transparency: bool = True,
-    weather_optimizer: str = "Adam",
-    weather_alph_motion: float = 1000.0,
-    weather_alph_motionoffset: float = 1000.0,
-    weather_motionblur_samples: int = 10,
-    weather_do_motionblur: bool = True,
-    weather_motionblur_scale: float = 0.025,
-    weather_depth_check: bool = False,
-    weather_depth_check_differentiable: bool = False,
-    weather_transparency_scale: float = 1.0,
-    weather_rendering_method: str = "additive",
-    weather_recolor: bool = False,
-    weather_flake_r: float = 255.0,
-    weather_flake_g: float = 255.0,
-    weather_flake_b: float = 255.0,
+    model_args: Namespace | None = None,
 ):
     """
     Evaluate the robustness of optical flow estimation under various conditions, including
     adversarial attacks, adversarial weather, 2D common corruptions, and 3D common corruptions.
+
+    This function provides a simplified interface to `flowbench.attacks.attack(...)`
+    as well as automatic retrieving existing results from eval_csv/evals.csv without re-running experiments.
 
     Args:
         model_name (str): Name of the optical flow model (e.g., 'CCMR', 'RAFT').
@@ -103,28 +84,9 @@ def evaluate(
         num_particles (int): Number of particles per frame (used in adversarial weather).
         severity (int): Corruption severity level (1–5) used in 2D and 3D common corruptions.
         attack_loss (str): Set the name of the used loss function (mse, epe, cosim).
-        weather_scene_scale (float): A global scaling to the scene depth.
-        weather_data (str): Path to dataset that contains weather data.
-        weather_model_iters (int): Number of iters for gma/raft model.
-        weather_steps (int): Number of optimization steps per image.
-        weather_learn_offset (bool): Whether to optimize initial position of particles.
-        weather_learn_motionoffset (bool): Whether to optimize endpoint of particle motion.
-        weather_learn_color (bool): Whether to optimize color of particles.
-        weather_learn_transparency (bool): Whether to optimize transparency of particles.
-        weather_optimizer (str): Optimizer used for perturbations.
-        weather_alph_motion (float): Weighting for the motion loss.
-        weather_alph_motionoffset (float): Weighting for the motion offset loss.
-        weather_motionblur_samples (int): Number of flakes drawn per blurred flake.
-        weather_do_motionblur (bool): Control if particles are rendered with motion blur.
-        weather_motionblur_scale (float): Scaling factor for motion blur.
-        weather_depth_check (bool): Whether particles are rendered if behind an object.
-        weather_depth_check_differentiable (bool): Whether rendering check for occlusion is in compute graph.
-        weather_transparency_scale (float): Scaling factor for particle transparency.
-        weather_rendering_method (str): Method for rendering particle color.
-        weather_recolor (bool): Whether all weather is recolored with given RGB value.
-        weather_flake_r (float): R value for particle RGB.
-        weather_flake_g (float): G value for particle RGB.
-        weather_flake_b (float): B value for particle RGB.
+        model_args (Namespace):
+            Parameters for the model.
+            (e.g., for RAFT, if model_args=Namespace(iters=12), we initialize RAFT(iters=12))
     """
     model_name = model_name.lower()
     if model_name not in get_list_of_available_models_list():
@@ -158,12 +120,14 @@ def evaluate(
                 return model, results
 
         # run on unperturbed and unaltered images
-        args = get_args_parser(model_name, dataset)
-        args.output_path = Path(f'outputs/validate/{model_name}_{args.pretrained_ckpt}/unperturbed')
+        ptlf_cli = get_default_cli(model_name, dataset)
+        args = ptlf_cli.config
+        data_module = ptlf_cli.datamodule
+        args.output_path = Path(f'outputs/validate/{model_name}_{args.ckpt_path}/unperturbed')
         args.output_path.mkdir(parents=True, exist_ok=True)
 
-        model = get_model(model_name, args.pretrained_ckpt, args)
-        attack(args, model)
+        model = get_model(model_name, args.ckpt_path, model_args)
+        attack(args, model, data_module)
 
         # load results from json
         results = get_results(args.output_path / f'metrics_{dataset}.json')
@@ -201,8 +165,10 @@ def evaluate(
                 return model, results
 
         # run Adversarial Attacks
-        args = get_args_parser(model_name, dataset)
-        args.output_path = Path(f'outputs/validate/{model_name}_{args.pretrained_ckpt}/{threat_model}')
+        ptlf_cli = get_default_cli(model_name, dataset)
+        args = ptlf_cli.config
+        data_module = ptlf_cli.datamodule
+        args.output_path = Path(f'outputs/validate/{model_name}_{args.ckpt_path}/{threat_model}')
         args.output_path.mkdir(parents=True, exist_ok=True)
         args.attack = threat_model
         args.attack_optim_target = optim_wrt
@@ -213,8 +179,8 @@ def evaluate(
         args.attack_targeted = targeted
         args.attack_target = target
 
-        model = get_model(model_name, args.pretrained_ckpt, args)
-        attack(args, model)
+        model = get_model(model_name, args.ckpt_path, model_args)
+        attack(args, model, data_module)
 
         # load results from json
         results = get_results(args.output_path / f'metrics_{dataset}.json')
@@ -239,15 +205,17 @@ def evaluate(
                 return model, results
 
         # run Adversarial Weather
-        args = get_args_parser(model_name, dataset)
-        args.output_path = Path(f'outputs/validate/{model_name}_{args.pretrained_ckpt}/weather/{weather}')
+        ptlf_cli = get_default_cli(model_name, dataset)
+        args = ptlf_cli.config
+        data_module = ptlf_cli.datamodule
+        args.output_path = Path(f'outputs/validate/{model_name}_{args.ckpt_path}/weather/{weather}')
         args.output_path.mkdir(parents=True, exist_ok=True)
         args.attack = 'weather'
         args.attack_targeted = targeted
         args.attack_target = target
 
-        model = get_model(model_name, args.pretrained_ckpt, args)
-        attack(args, model)
+        model = get_model(model_name, args.ckpt_path, model_args)
+        attack(args, model, data_module)
 
         # load results from json
         results = get_results(args.output_path / f'metrics_{dataset}.json')
@@ -275,14 +243,16 @@ def evaluate(
 
         # run 2D Common Corruption
         for corruption in common_corruptions_2d:
-            args = get_args_parser(model_name, dataset)
-            args.output_path = Path(f'outputs/validate/{model_name}_{args.pretrained_ckpt}/2dcc/{corruption}')
+            ptlf_cli = get_default_cli(model_name, dataset)
+            args = ptlf_cli.config
+            data_module = ptlf_cli.datamodule
+            args.output_path = Path(f'outputs/validate/{model_name}_{args.ckpt_path}/2dcc/{corruption}')
             args.output_path.mkdir(parents=True, exist_ok=True)
             args.attack = 'common_corruptions'
             args.cc_name = corruption
             args.cc_severity = severity
-            model = get_model(model_name, args.pretrained_ckpt, args)
-            attack(args, model)
+            model = get_model(model_name, args.ckpt_path, model_args)
+            attack(args, model, data_module)
 
             # load results from json
             metric_values = get_results(args.output_path / f'metrics_{dataset}.json')
@@ -311,20 +281,17 @@ def evaluate(
 
         # run 3D Common Corruption
         for corruption in common_corruptions_3d:
-            args = get_args_parser(model_name, dataset)
-            args.output_path = Path(f'outputs/validate/{model_name}_{args.pretrained_ckpt}/3dcc/{corruption}')
+            ptlf_cli = get_default_cli(model_name, dataset)
+            args = ptlf_cli.config
+            data_module = ptlf_cli.datamodule
+            args.output_path = Path(f'outputs/validate/{model_name}_{args.ckpt_path}/3dcc/{corruption}')
             args.output_path.mkdir(parents=True, exist_ok=True)
             args.attack = '3dcc'
             args.tdcc_corruption = corruption
             args.tdcc_intensity = severity
-            if dataset == 'kitti-2015':
-                args.kitti_2012_3DCC_root_dir = None
-                args.kitti_2015_3DCC_root_dir = 'datasets/3D_Common_Corruption_Images/kitti2015'
-            elif dataset in ['sintel-clean', 'sintel-final']:
-                args.mpi_sintel_3DCC_root_dir = 'datasets/3D_Common_Corruption_Images/Sintel'
 
-            model = get_model(model_name, args.pretrained_ckpt, args)
-            attack(args, model)
+            model = get_model(model_name, args.ckpt_path, model_args)
+            attack(args, model, data_module)
 
             # load results from json
             metric_values = get_results(args.output_path / f'metrics_{dataset}.json')
@@ -347,23 +314,26 @@ if __name__ == "__main__":
         model_name='RAFT',
         dataset='KITTI2015',
         retrieve_existing=True,
+        model_args=Namespace({'model.iters': 32})
     )
     print(results)
 
+    print('abc abc abc')
     model, results = evaluate(
         model_name='RAFT',
         dataset='KITTI2015',
-        retrieve_existing=True,
+        retrieve_existing=False,
         threat_model='PGD',
         iterations=20, epsilon=8/255, alpha=0.01, lp_norm='Linf',
         targeted=True, target='zero', optim_wrt='ground_truth',
+        model_args=Namespace({'model.iters': 32})
     )
     print(results)
 
     model, results = evaluate(
         model_name='RAFT',
         dataset='Sintel-Final',
-        retrieve_existing=True,
+        retrieve_existing=False,
         threat_model='Adversarial_Weather',
         weather='snow', num_particles=10000, targeted=True, target='zero',
     )
@@ -372,7 +342,7 @@ if __name__ == "__main__":
     model, results = evaluate(
         model_name='RAFT',
         dataset='KITTI2015',
-        retrieve_existing=True,
+        retrieve_existing=False,
         threat_model='2DCommonCorruption',
         severity=3,
     )
@@ -381,7 +351,7 @@ if __name__ == "__main__":
     model, results = evaluate(
         model_name='RAFT',
         dataset='KITTI2015',
-        retrieve_existing=True,
+        retrieve_existing=False,
         threat_model='3DCommonCorruption',
         severity=3,
     )

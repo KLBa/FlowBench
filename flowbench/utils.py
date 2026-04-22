@@ -1,32 +1,45 @@
-import argparse
+from jsonargparse import Namespace
 import json
 
 from pathlib import Path
 from ptlflow import get_model_reference
-from typing import Dict, Optional
+from ptlflow.data.flow_datamodule import FlowDataModule
+from ptlflow.utils.registry import RegisteredModel
+from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
+from loguru import logger
+from typing import Dict, Optional, Tuple
 
 from .attacks import _init_parser
 
 
-def get_args_parser(model_name: str, dataset: str) -> argparse.Namespace:
+def get_default_cli(model_name: str, dataset: str) -> PTLFlowCLI:
+    """Return default arguments and data loader. To be used for the Python API."""
     # merge threat arguments with optical flow model-specific arguments
     parser = _init_parser()
-    model_ref = get_model_reference(model_name)
-    parser = model_ref.add_model_specific_args(parser)
-    args = parser.parse_args()
+    manual_args = Namespace()
 
-    # update common arguments
-    args.model = model_name
-    args.val_dataset = dataset
-    args.pretrained_ckpt = get_pretrained_ckpt(dataset)
-    args.write_outputs = True
-    if dataset == 'kitti-2015':
-        args.kitti_2012_root_dir = None
-        args.kitti_2015_root_dir = 'datasets/kitti2015'
-    elif dataset in ['sintel-clean', 'sintel-final']:
-        args.mpi_sintel_root_dir = 'datasets/Sintel'
+    manual_args.model = model_name
+    manual_args['data.val_dataset'] = dataset
 
-    return args
+    manual_args.ckpt_path = get_pretrained_ckpt(dataset)
+    logger.info(f'Set ckpt_path to {manual_args.ckpt_path}')
+
+    manual_args.write_outputs = True
+    
+    logger.info(f'Manual Arguments: {manual_args}')
+
+    cli = PTLFlowCLI(
+        model_class=RegisteredModel,
+        subclass_mode_model=True,
+        datamodule_class=FlowDataModule,
+        parser_kwargs={'parents': [parser]},
+        run=False,
+        parse_only=False,
+        auto_configure_optimizers=False,
+        args=manual_args
+    )
+
+    return cli
 
 
 def get_pretrained_ckpt(dataset: str) -> str:
