@@ -642,15 +642,17 @@ def _init_parser() -> ArgumentParser:
     return parser
 
 
-def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> pd.DataFrame:
-    """Perform the validation.
+def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> None:
+    """Perform the validation and write results to args.output_path.
 
     Parameters
     ----------
     args : Namespace
-        Arguments to configure the model and the validation.
+        Arguments to configure the attack, validation and logging.
     model : BaseModel
         The model to be used for validation.
+    data_module : FlowDataModule
+        The data module used for validation. The val_dataset must be defined.
 
     Returns
     -------
@@ -761,7 +763,7 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> pd
                 try:
                     json.dumps(metrics, indent=4)
                 except Exception as e:
-                    logger.error(f"Error {e}")
+                    logger.error(f"Exception {e}")
                     print('Tried to serialize:', metrics)
                     print(type(metrics['experiemnts'][0]['model']))
                     raise e
