@@ -37,7 +37,6 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from loguru import logger
 
-import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # adds project root
 
 from attacks.fgsm import fgsm
@@ -677,10 +676,10 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> pd
     iteration_data = []
     start_time = datetime.now()
     output_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
-    output_data.append(("model", args.model.class_path.split('.')[-1]))
+    output_data.append(("model", args.model.as_dict()))
     output_data.append(("checkpoint", args.ckpt_path))
     iteration_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
-    iteration_data.append(("model", args.model))
+    iteration_data.append(("model", args.model.as_dict()))
     iteration_data.append(("checkpoint", args.ckpt_path))
     attack_args_parser = AttackArgumentParser(args)
 
@@ -747,7 +746,7 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> pd
                     else:
                         iteration_output_dict[key] = value
                 output_filename = (
-                    args.output_path / f"iteration_metrics_{args.val_dataset}.json"
+                    args.output_path / f"iteration_metrics_{args.data.val_dataset}.json"
                 )
 
                 if os.path.exists(output_filename) and not overwrite_flag:
@@ -757,6 +756,15 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> pd
                     metrics = {"experiments": []}
 
                 metrics["experiments"].append(iteration_output_dict)
+                
+                # Check that metrics is serializable before writing an incomplete json
+                try:
+                    json.dumps(metrics, indent=4)
+                except Exception as e:
+                    logger.error(f"Error {e}")
+                    print('Tried to serialize:', metrics)
+                    print(type(metrics['experiemnts'][0]['model']))
+                    raise e
 
                 with open(output_filename, "w") as json_file:
                     json.dump(metrics, json_file, indent=4)
