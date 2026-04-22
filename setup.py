@@ -20,6 +20,6 @@ setup(
         "torchvision==0.22.0+cu118",
         "matplotlib==3.10.3"
     ],
-    python_requires='>=3.10, <3.11',
+    python_requires='>=3.10, <3.15',
     license='MIT',
 )
