@@ -20,6 +20,14 @@ This package requires **Python 3.10.x** (tested with 3.10.17). Please ensure you
 > In such cases, follow the official PyTorch installation instructions to install a compatible version:
 > https://pytorch.org/get-started/locally/
 
+### Step 0: Clone the repository including submodules
+
+```bash
+git clone --recurse-submodules <url>
+# If you cloned without --recurse-submodules, run: 
+git submodule update --init --recursive
+```
+
 ### Step 1: Run the installation script
 
 ```bash
