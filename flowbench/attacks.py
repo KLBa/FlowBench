@@ -336,7 +336,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--output_path",
         type=str,
-        default=str(Path("outputs/validate")),
+        default=str(Path("outputs/flowbench")),
         help="Path to the directory where the validation results will be saved.",
     )
     parser.add_argument(
