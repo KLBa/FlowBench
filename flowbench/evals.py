@@ -65,7 +65,7 @@ def evaluate(
     Evaluate the robustness of optical flow estimation under various conditions, including
     adversarial attacks, adversarial weather, 2D common corruptions, and 3D common corruptions.
 
-    This function provides a simplified interface to `flowbench.attacks.attack(...)`
+    This function provides a simplified interface to `flowbench.attacks.attack(...)`, e.g. sets args.output_path to a standardized path,
     as well as automatic retrieving existing results from eval_csv/evals.csv without re-running experiments.
 
     Args:
