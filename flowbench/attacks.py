@@ -39,6 +39,7 @@ from loguru import logger
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # adds project root
 
+from attacks.data.flow_datamodule_extended import FlowDataModuleFlowBench
 from attacks.fgsm import fgsm
 from attacks.apgd import apgd
 from attacks.bim_pgd_cospgd import bim_pgd_cospgd
@@ -642,7 +643,7 @@ def _init_parser() -> ArgumentParser:
     return parser
 
 
-def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> None:
+def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBench) -> None:
     """Perform the validation and write results to args.output_path.
 
     Parameters
@@ -696,7 +697,7 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModule) -> No
         logger.info(f"Attack arguments: {attack_args}")
         for dataset_name, dl in dataloaders.items():
             metrics_mean, iteration_metrics_mean = attack_one_dataloader(
-                args, attack_args, model, dl, dataset_name
+                args, attack_args, model, dl, dataset_name, data_module=data_module
             )
 
             end_time = datetime.now()
@@ -779,6 +780,7 @@ def attack_one_dataloader(
     model: BaseModel,
     dataloader: DataLoader,
     dataloader_name: str,
+    data_module: Optional[FlowDataModuleFlowBench] = None
 ) -> Dict[str, float]:
     """Perform adversarial attack for all examples of one dataloader.
 
@@ -792,6 +794,8 @@ def attack_one_dataloader(
         The dataloader for the validation.
     dataloader_name : str
         A string to identify this dataloader.
+    data_module : FlowDataModule
+        Required for 3DCC to load corrupted dataset.
 
     Returns
     -------
@@ -809,8 +813,9 @@ def attack_one_dataloader(
         attack_args["model"] = args.model
 
     if attack_args["attack"] == "3dcc":
+        assert data_module is not None, "The attack 3DCC requires the data_module to be passed."
         dataloader = get_dataset_3DCC(
-            model,
+            data_module,
             dataloader_name,
             attack_args["tdcc_corruption"],
             attack_args["tdcc_intensity"],
@@ -1330,7 +1335,7 @@ if __name__ == "__main__":
     cli = PTLFlowCLI(
         model_class=RegisteredModel,
         subclass_mode_model=True,
-        datamodule_class=FlowDataModule,
+        datamodule_class=FlowDataModuleFlowBench,
         parser_kwargs={'parents': [parser]},
         run=False,
         parse_only=False,

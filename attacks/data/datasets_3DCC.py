@@ -19,7 +19,7 @@
 
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
-from ptlflow.data.datasets import BaseFlowDataset, THIS_DIR
+from ptlflow.data.datasets import BaseFlowDataset, THIS_DIR # THIS_DIR is a path to the folder with txt files specifying validation splits.
 import torch
 from ptlflow.utils.utils import config_logging
 from ptlflow.utils.utils import config_logging, make_divisible, bgr_val_as_tensor
