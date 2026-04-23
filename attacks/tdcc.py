@@ -10,11 +10,10 @@ from torch.utils.data import DataLoader, Dataset
 
 config_logging()
 from ptlflow.data import flow_transforms as ft
-from ptlflow.data.datasets_3DCC import (
+from .data.datasets_3DCC import (
     KittiDataset3DCC,
     SintelDataset3DCC,
 )
-import attacks.tdcc as tdcc
 
 # call_dictionary = {"_get_kitti3DCC_dataset": _get_kitti3DCC_dataset}
 
