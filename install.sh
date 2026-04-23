@@ -18,9 +18,9 @@ python -m pip install git+https://github.com/ClementPinard/Pytorch-Correlation-e
 
 echo "Installing local ptlflow package..."
 cd _ptlflow
-python -m pip install .
+python -m pip install -e . # editable because you never know
 
-echo "Installing alt_cuda_corr extensiocondn..."
+echo "Installing alt_cuda_corr extension..."
 cd ptlflow/utils/external/alt_cuda_corr/
 python setup.py install
 cd ../../../
