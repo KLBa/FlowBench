@@ -36,6 +36,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from loguru import logger
+import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # adds project root
 
@@ -772,6 +773,14 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBen
                 with open(output_filename, "w") as json_file:
                     json.dump(metrics, json_file, indent=4)
 
+                # Write args to file (If args is a PTLFlowCLI.config, this contains all CLI arguments including defaults)
+                config_path = args.output_path / 'full_configs' / start_time.strftime("%Y%m%d_%H%M%S") / "config.yaml"
+                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                    
+                with open(config_path, "w") as f:
+                    yaml.dump(args, f)
+                    print(f'config saved to {config_path}')
+
 
 @torch.enable_grad()
 def attack_one_dataloader(
@@ -1096,7 +1105,10 @@ def attack_one_dataloader(
                     iteration_metrics_sum[k] = 0.0
                 iteration_metrics_sum[k] += iteration_metrics[k].item()
 
-            free, total = torch.cuda.mem_get_info()
+            if torch.cuda.is_available():
+                free, total = torch.cuda.mem_get_info()
+            else:
+                free, total = 0, 0
             tdl.set_postfix(
                 epe=metrics_sum["val/epe"] / (i + 1),
                 flall=metrics_sum["val/flall"] / (i + 1),
