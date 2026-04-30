@@ -23,7 +23,7 @@ from ptlflow import restore_model
 from attacks.data.flow_datamodule_extended import FlowDataModuleFlowBench
 from flowbench.attacks import attack, _init_parser
 
-from .my_new_model import * # registers model in ptlflow, so the passed model doesn't need to be fully qualified
+from .my_new_models import * # registers model in ptlflow, so the passed model doesn't need to be fully qualified
 
 if __name__ == "__main__":
     parser = _init_parser() # Parser for attack arguments
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         # # (This is useful in case you want a self-contained Python program without command line arguments and configs.)
         # # However, then you can not pass program arguments.
         # args=Namespace(
-        #     model=Namespace(class_path="my_new_model.raft.my_very_own_raft"),
+        #     model=Namespace(class_path="my_new_models.raft.my_very_own_raft"),
         #     ckpt_path="sintel",
         #     data=Namespace(val_dataset="sintel-final", dataset_config_path="../datasets.yaml"),
         #     attack=["pcfa"]

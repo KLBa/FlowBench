@@ -3,7 +3,7 @@ It's less customizable than directly calling flowbench.attacks.attack(args, ...)
 """
 
 
-from my_new_model import * # registers model to PTLFlow
+from my_new_models import * # registers model to PTLFlow
 
 from flowbench.evals import evaluate
 

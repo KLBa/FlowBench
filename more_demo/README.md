@@ -4,7 +4,7 @@ This folder contains some (hopefully) independent scripts on how to run an attac
 
 ## Folder Contents
 
-* [my_new_model/](my_new_model/) defines a custom model for the demo.
+* [my_new_models/](my_new_models/) defines a custom model for the demo.
 
   (Here we just extend the RAFT model defined by ptlflow and register it under a new name. Cf. [the ptlflow docs](https://ptlflow.readthedocs.io/en/latest/custom/new_model.html) for how to define a model that is compatible with PTLFlow.)
 

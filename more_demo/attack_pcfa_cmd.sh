@@ -1,5 +1,5 @@
 python -m  flowbench.attacks \
-        --model my_new_model.raft.my_very_own_raft \
+        --model my_new_models.raft.my_very_own_raft \
         --model.iters 12 \
         --ckpt_path sintel \
         --attack pcfa \
