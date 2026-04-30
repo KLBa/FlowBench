@@ -1,0 +1,20 @@
+
+attack:
+  - pcfa
+attack_iterations:
+  - 20
+attack_epsilon:
+  - 0.005
+attack_alpha: 1e-7
+pcfa_boxconstraint:
+  - change_of_variables
+write_outputs: True
+
+model:
+  class_path: ptlflow.models.raft
+  init_args:
+    iters: 12
+ckpt_path: kitti
+
+data:
+  val_dataset: kitti-2015-trainval

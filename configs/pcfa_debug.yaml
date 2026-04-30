@@ -1,0 +1,34 @@
+
+# call with:
+#   python -m flowbench.attacks --config configs/pcfa_debug.yaml [--data.dataset_config_path /path/to/dataset.yaml]
+# 
+# which is equivalent to:
+#   python -m flowbench.attacks \
+#             --attack pcfa \
+#             -- 2 \
+#             --attack_epsilon 0.005
+#             --attack_alpha 1e-7
+#             --pcfa_boxconstraint change_of_variables
+#             --write_outputs
+#             --model raft
+#             --ckpt_path sintel
+#             --data.val_dataset sintel-final-trainval
+#             [--data.dataset_config_path ]
+
+
+attack:
+  - pcfa
+attack_iterations: # number of optimizer steps to find perturbation
+  - 2
+attack_epsilon: # limits perturbation norm
+  - 0.005
+attack_alpha: 1e-7
+pcfa_boxconstraint:
+  - change_of_variables
+write_outputs: True
+
+model: raft
+ckpt_path: sintel
+
+data:
+  val_dataset: sintel-final-trainval
