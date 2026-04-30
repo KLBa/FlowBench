@@ -28,7 +28,10 @@ git clone --recurse-submodules <url>
 git submodule update --init --recursive
 ```
 
-### Step 1: Run the installation script
+### ~~Step 1: Run the installation script~~
+
+Just try to run stuff and install missing packages as you encounter them.
+Refer to `install.sh` for how the FlowBench's authors installed packages but you may need different versions, e.g., PyTorch version depends on your CUDA version, `spatial-correlation-sampler` is notoriously not working for me and `alt_cuda_corr` is also growing increasingly old...
 
 ```bash
 bash install.sh
