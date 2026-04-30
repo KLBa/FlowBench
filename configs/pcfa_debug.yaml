@@ -5,16 +5,15 @@
 # which is equivalent to:
 #   python -m flowbench.attacks \
 #             --attack pcfa \
-#             -- 2 \
-#             --attack_epsilon 0.005
-#             --attack_alpha 1e-7
-#             --pcfa_boxconstraint change_of_variables
-#             --write_outputs
-#             --model raft
-#             --ckpt_path sintel
-#             --data.val_dataset sintel-final-trainval
-#             [--data.dataset_config_path ]
-
+#             --attack_iterations 2 \
+#             --attack_epsilon 0.005 \
+#             --attack_alpha 1e-7 \
+#             --pcfa_boxconstraint change_of_variables \
+#             --write_outputs \
+#             --model raft \
+#             --ckpt_path sintel \
+#             --data.val_dataset sintel-final-trainval \
+#             [--data.dataset_config_path /path/to/dataset.yaml]
 
 attack:
   - pcfa
