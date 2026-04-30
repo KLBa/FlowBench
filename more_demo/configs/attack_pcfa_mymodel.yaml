@@ -1,0 +1,20 @@
+
+# FlowBench's args and other custom arguments
+attack:
+  - pcfa
+attack_iterations:
+  - 20
+output_path: outputs/attack
+# ckpt_path: sintel
+
+# PTLFlow arguments (i.e., model and data parameters)
+model: 
+  class_path: my_new_models.my_model.my_model # can also be a pre-defined model from PTLFlow
+  init_args:
+    my_arg1: 1
+    my_arg2:
+      - 1.5
+      - 2.1
+    my_arg3: 5
+data:
+  val_dataset: sintel-final+kitti-2015
