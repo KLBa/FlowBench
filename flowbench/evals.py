@@ -318,7 +318,6 @@ if __name__ == "__main__":
     )
     print(results)
 
-    print('abc abc abc')
     model, results = evaluate(
         model_name='RAFT',
         dataset='KITTI2015',
