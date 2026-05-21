@@ -2,21 +2,21 @@
 
 * Restructure attacks to be callable classes.
 
-  Progress:
+  Progress: ([code created] [code checked against previous version])
 
-  * [x] Set up framework to work with attack objects
-  * [ ] fgsm
-  * [ ] bim
-  * [ ] pgd
-  * [ ] cospgd
-  * [ ] ffgsm
-  * [ ] apgd
-  * [ ] fab
-  * [x] pcfa
-  * [ ] weather
-  * [x] 3dcc
-  * [ ] common_corruptions
-  * [ ] none
+  * [x] [-] Set up framework to work with attack objects
+  * [x] [ ] fgsm
+  * [x] [ ] bim
+  * [x] [ ] pgd
+  * [x] [ ] cospgd
+  * [x] [ ] ffgsm
+  * [x] [ ] apgd
+  * [x] [ ] fab
+  * [x] [ ] pcfa
+  * [x] [ ] weather
+  * [x] [x] 3dcc
+  * [x] [ ] common_corruptions
+  * [x] [ ] none
 
 ## 2026-05-05 commits from ef0e551 to 5413267
 
