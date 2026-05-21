@@ -1,7 +1,7 @@
 # coding=utf-8
 import os
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from ptlflow.models.base_model.base_model import BaseModel
 from attacks.attack_utils.utils import (
@@ -38,8 +38,8 @@ def weather(
     attack_args: Dict[str, List[object]],
     model: BaseModel,
     targeted_inputs: Dict[str, torch.Tensor],
-    batch_index: int,
-    output_path: str,
+    batch_index: Optional[int] = None,
+    output_path: Optional[str] = None,
 ):
     torch.cuda.empty_cache()
     print("Print all keys", attack_args)
@@ -365,48 +365,51 @@ def attack_image(
         weather_min,
         attack_args,
     )
+    
+    if batch_index is not None:
+        assert output_path is not None, "For saving the results, pass both output path and batch index."
 
-    # ======== Save Attacked Images ========
-    distortion_folder = output_path / "attacked_sintel_dataset" / scene
-    distortion_folder.mkdir(parents=True, exist_ok=True)
+        # ======== Save Attacked Images ========
+        distortion_folder = output_path / "attacked_sintel_dataset" / scene
+        distortion_folder.mkdir(parents=True, exist_ok=True)
 
-    save_image(
-        image1_weather,
-        batch_index,
-        distortion_folder,
-        image_name=f"frame_{image_index:04d}.png",
-        unit_input=True,
-        normalize_max=None,
-        force_name=True,
-    )
-    save_image(
-        image2_weather,
-        batch_index,
-        distortion_folder,
-        image_name=f"frame_{(image_index + 1):04d}.png",
-        unit_input=True,
-        normalize_max=None,
-        force_name=True,
-    )
+        save_image(
+            image1_weather,
+            batch_index,
+            distortion_folder,
+            image_name=f"frame_{image_index:04d}.png",
+            unit_input=True,
+            normalize_max=None,
+            force_name=True,
+        )
+        save_image(
+            image2_weather,
+            batch_index,
+            distortion_folder,
+            image_name=f"frame_{(image_index + 1):04d}.png",
+            unit_input=True,
+            normalize_max=None,
+            force_name=True,
+        )
 
-    # ======== Save Predicted Flow for Origin Image =======
-    flow_folder = output_path / "flow_for_origin" / scene
-    flow_folder.mkdir(parents=True, exist_ok=True)
-    save_flow(
-        flow_init,
-        batch_index,
-        flow_folder,
-        flow_name=f"ORIGIN_[im_{image_index}]_[w_step_{attack_args['weather_steps']}]_[w_m_samples_{attack_args['weather_motionblur_samples']}]",
-    )
+        # ======== Save Predicted Flow for Origin Image =======
+        flow_folder = output_path / "flow_for_origin" / scene
+        flow_folder.mkdir(parents=True, exist_ok=True)
+        save_flow(
+            flow_init,
+            batch_index,
+            flow_folder,
+            flow_name=f"ORIGIN_[im_{image_index}]_[w_step_{attack_args['weather_steps']}]_[w_m_samples_{attack_args['weather_motionblur_samples']}]",
+        )
 
-    # ======== Save Predicted Flow for Attacked Image =======
-    flow_folder = output_path / "flow_for_attacked" / scene
-    flow_folder.mkdir(parents=True, exist_ok=True)
-    save_flow(
-        flow_weather_pred,
-        batch_index,
-        flow_folder,
-        flow_name=f"ATTACKED_[im_{image_index}]_[w_step_{attack_args['weather_steps']}]_[w_m_samples_{attack_args['weather_motionblur_samples']}]",
-    )
+        # ======== Save Predicted Flow for Attacked Image =======
+        flow_folder = output_path / "flow_for_attacked" / scene
+        flow_folder.mkdir(parents=True, exist_ok=True)
+        save_flow(
+            flow_weather_pred,
+            batch_index,
+            flow_folder,
+            flow_name=f"ATTACKED_[im_{image_index}]_[w_step_{attack_args['weather_steps']}]_[w_m_samples_{attack_args['weather_motionblur_samples']}]",
+        )
 
     return preds, image1_weather, image2_weather
