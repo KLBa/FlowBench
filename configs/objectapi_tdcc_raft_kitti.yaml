@@ -1,0 +1,18 @@
+
+attack_obj:
+  class_path: attacks.ptl_attacks.tdcc.tdcc.CommonCorruptions3D
+  init_args:
+    tdcc_corruption: far_focus
+    tdcc_intensity: 3
+
+write_outputs: True
+output_path: outputs/flowbench_objectapi
+
+model:
+  class_path: ptlflow.models.raft
+  init_args:
+    iters: 12
+ckpt_path: kitti
+
+data:
+  val_dataset: kitti-2015-trainval

@@ -40,7 +40,10 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # adds project root
 
+from attacks.ptl_attacks.cli.flowbench_cli import FlowBenchCLI
+from attacks.ptl_attacks.base_attack.base_attack import BaseAttack
 from attacks.data.flow_datamodule_extended import FlowDataModuleFlowBench
+
 from attacks.fgsm import fgsm
 from attacks.apgd import apgd
 from attacks.bim_pgd_cospgd import bim_pgd_cospgd
@@ -108,6 +111,7 @@ def bool_or_rgb(value):
             return rgb
     raise ArgumentTypeError(f"Expected bool or RGB tuple, got: {value}")
 
+
 def _init_parser() -> ArgumentParser:
     parser = ArgumentParser(add_help=False)
     parser.add_argument(
@@ -116,224 +120,7 @@ def _init_parser() -> ArgumentParser:
         default=None,
         help=("Path to a ckpt file for the chosen model."),
     )
-    parser.add_argument(
-        "--attack",
-        type=str,
-        default=["none"],
-        nargs="*",
-        choices=[
-            "fgsm",
-            "bim",
-            "pgd",
-            "cospgd",
-            "ffgsm",
-            "apgd",
-            "fab",
-            "pcfa",
-            "weather",
-            "3dcc",
-            "common_corruptions",
-            "none",
-        ],
-        help="Name of the attack to use.",
-    )
-    parser.add_argument(
-        "--attack_optim_target",
-        type=str,
-        default=["ground_truth"],
-        nargs="*",
-        choices=["ground_truth", "initial_flow"],
-        help="Set optimization target for adversarial attacks.",
-    )
-    parser.add_argument(
-        "--cc_name",
-        type=str,
-        default=["gaussian_noise"],
-        nargs="*",
-        choices=[
-            "gaussian_noise",
-            "shot_noise",
-            "impulse_noise",
-            "defocus_blur",
-            "glass_blur",
-            "motion_blur",
-            "zoom_blur",
-            "snow",
-            "frost",
-            "fog",
-            "brightness",
-            "contrast",
-            "elastic_transform",
-            "pixelate",
-            "jpeg_compression",
-        ],
-        help="Name of the common corruption to use on the input images.",
-    )
-    parser.add_argument(
-        "--cc_severity",
-        type=int,
-        default=[1],
-        nargs="*",
-        choices=[1, 2, 3, 4, 5],
-        help="Severity of the common corruption to use on the input images.",
-    )
-    parser.add_argument(
-        "--attack_norm",
-        type=str,
-        default=[norm],
-        nargs="*",
-        choices=["two", "inf"],
-        help="Set norm to use for adversarial attack.",
-    )
-    parser.add_argument(
-        "--attack_epsilon",
-        type=float,
-        default=[epsilon],
-        nargs="*",
-        help="Set epsilon to use for adversarial attack.",
-    )
-    parser.add_argument(
-        "--pcfa_boxconstraint",
-        default=["change_of_variables"],
-        nargs="*",
-        choices=["clipping", "change_of_variables"],
-        help="the way to enfoce the box constraint on the distortion. Options: 'clipping', 'change_of_variables'.",
-    )
-    # parser.add_argument(
-    #     "--pcfa_delta_bound",
-    #     type=float,
-    #     default=delta_bound,
-    #     nargs="*",
-    #     help="Set delta bound to use for PCFA.",
-    # )
-    # parser.add_argument(
-    #     "--pcfa_steps",
-    #     default=5,
-    #     type=int,
-    #     nargs="*",
-    #     help="the number of optimization steps per image (for non-universal perturbations only).",
-    # )
-    # parser.add_argument(
-    #     "--pcfa_eps_box",
-    #     default=1e-7,
-    #     type=float,
-    #     nargs="*",
-    #     help="The epsilon box for pcfa.",
-    # )
-    parser.add_argument(
-        "--apgd_rho",
-        default=[0.75],
-        nargs="*",
-        type=float,
-        help="parameter for step-size update (Default: 0.75)",
-    )
-    parser.add_argument(
-        "--apgd_n_restarts",
-        default=[1],
-        nargs="*",
-        type=int,
-        help="number of random restarts. (Default: 1)",
-    )
-    parser.add_argument(
-        "--apgd_eot_iter",
-        default=[1],
-        nargs="*",
-        type=int,
-        help="number of iteration for EOT. (Default: 1)",
-    )
-    parser.add_argument(
-        "--apgd_seed",
-        default=[0],
-        nargs="*",
-        type=int,
-        help="random seed for the starting point. (Default: 0)",
-    )
-    parser.add_argument(
-        "--apgd_steps",
-        default=[10],
-        nargs="*",
-        type=int,
-        help="number of steps. (Default: 10)",
-    )
-    parser.add_argument(
-        "--attack_iterations",
-        type=int,
-        default=[iterations],
-        nargs="*",
-        help="Set number of iterations for adversarial attack.",
-    )
-    parser.add_argument(
-        "--attack_alpha",
-        type=float,
-        default=alpha,
-        help="Set alpha to use for adversarial attack.",
-    )
-    parser.add_argument(
-        "--attack_targeted",
-        type=attack_targeted_string,
-        default=[targeted],
-        nargs="*",
-        help="Set if adversarial attack should be targeted.",
-    )
-    parser.add_argument(
-        "--attack_target",
-        type=str,
-        default=["zero"],
-        nargs="*",
-        choices=["zero", "negative"],
-        help="Set the target for a tagreted attack.",
-    )
-    parser.add_argument(
-        "--attack_loss",
-        type=str,
-        default=["epe"],
-        nargs="*",
-        help="Set the name of the used loss function (mse, epe)",
-    )
-    parser.add_argument(
-        "--tdcc_intensity",
-        type=int,
-        choices=[1, 2, 3, 4, 5],
-        default=[3],
-        nargs="*",
-        help="Set the the intensity of the 3DCC corruption, int between 1 and 5",
-    )
-    parser.add_argument(
-        "--tdcc_corruption",
-        type=str,
-        default=["far_focus"],
-        nargs="*",
-        choices=[
-            "far_focus",
-            "near_focus",
-            "fog_3d",
-            "color_quant",
-            "iso_noise",
-            "low_light",
-            "xy_motion_blur",
-            "z_motion_blur",
-        ],
-        help="Set the type of 3DCC",
-    )
-    parser.add_argument(
-        "--selection",
-        type=str,
-        nargs="+",
-        default=None,
-        help=(
-            "Used in combination with model=select. The select mode can be used to run the validation on multiple models "
-            "at once. Put a list of model names here separated by spaces."
-        ),
-    )
-    parser.add_argument(
-        "--exclude",
-        type=str,
-        nargs="+",
-        default=None,
-        help=(
-            "Used in combination with model=all. A list of model names that will not be validated."
-        ),
-    )
+    
     parser.add_argument(
         "--output_path",
         type=str,
@@ -420,251 +207,21 @@ def _init_parser() -> ArgumentParser:
         help="If set, save a table of metrics for every image.",
     )
     parser.add_argument("--overwrite_output", type=bool, default=False)
+    parser.add_argument(
+        "--compare_to_targets",
+        action="store_true",
+        help="If set, compare the attacked flow to the zero flow and negative predicted flow.",
+    )
 
-    # ======== Weather Attack Related Args ========
-    parser.add_argument(
-        "--weather_optimizer",
-        default="Adam",
-        help="the optimizer used for the perturbations.",
-    )
-    parser.add_argument(
-        "--weather_steps",
-        type=int,
-        default=[750],
-        nargs="*",
-        help="the number of optimization steps per image.",
-    )
-    parser.add_argument(
-        "--weather_learn_offset",
-        default=True,
-        type=bool_or_rgb,
-        help="if specified, initial position of the particles will be optimized.",
-    )
-    parser.add_argument(
-        "--weather_learn_motionoffset",
-        default=True,
-        type=bool_or_rgb,
-        help="if specified, the endpoint of the particle motion will be optimized (along with the starting point).",
-    )
-    parser.add_argument(
-        "--weather_learn_color",
-        default=True,
-        type=bool_or_rgb,
-        help="if specified, the color of the particle will be optimized.",
-    )
-    parser.add_argument(
-        "--weather_learn_transparency",
-        default=True,
-        type=bool_or_rgb,
-        help="if specified, the transparency of the particles will be optimized.",
-    )
-    parser.add_argument(
-        "--weather_alph_motion",
-        default=1000.0,
-        type=float,
-        help="weighting for the motion loss.",
-    )
-    parser.add_argument(
-        "--weather_alph_motionoffset",
-        default=1000.0,
-        type=float,
-        help="weighting for the motion offset loss.",
-    )
-    parser.add_argument(
-        "--weather_data",
-        default="/path/to/generated_weather_npz_data",
-        help="may specify a dataset that contains weather data (locations, masks, etc). It should have the same structure as the used dataset.",
-    )
-    parser.add_argument(
-        "--weather_dataset",
-        default=["Sintel"],
-        nargs="*",
-        help="specify the dataset which should be used for evaluation",
-    )
-    parser.add_argument(
-        "--weather_dataset_stage",
-        default="training",
-        choices=["training", "evaluation"],
-        help="specify the dataset stage ('training' or 'evaluation') that should be used.",
-    )
-    parser.add_argument(
-        "--weather_rendering_method",
-        default="additive",
-        choices=["meshkin", "additive"],
-        help="choose a method rendering the particle color. 'meshkin' use alpha-blending with order-independent transparency calculation, while 'additive' adds the color value to the image. Default: 'meshkin', choices: [meshkin, additive].",
-    )
-    parser.add_argument(
-        "--weather_transparency_scale",
-        default=1.0,
-        type=float,
-        help="a scaling factor, by which the tansparency for every particle is multiplied.",
-    )
-    parser.add_argument(
-        "--weather_depth_check",
-        default=False,
-        type=bool_or_rgb,
-        help="if specified, particles will not be rendered if behind an object.",
-    )
-    parser.add_argument(
-        "--weather_depth_check_differentiable",
-        type=bool_or_rgb,
-        default=[False],
-        nargs="*",
-        help="if specified, the rendering check for particle occlusion by objects is included into the compute graph.",
-    )
-    parser.add_argument(
-        "--weather_scene_scale",
-        default=1.0,
-        type=float,
-        help="A global scaling to the scene depth. If the value is > 1, all scenes will appear bigger and more particles will show up in the foreground.",
-    )
-    parser.add_argument(
-        "--weather_recolor",
-        default=False,
-        type=bool_or_rgb,
-        help="If specified, all weather is recolored with the given r,g,b value (no variations).",
-    )
-    parser.add_argument(
-        "--weather_do_motionblur",
-        default=True,
-        type=bool_or_rgb,
-        help="control if particles are rendered with motion blur (default=True).",
-    )
-    parser.add_argument(
-        "--weather_motionblur_scale",
-        default=0.025,
-        type=float,
-        help="a scaling factor in [0,1], by which the motion blur is shortened. No motion blur appears for 0, while the full blur vector is used with 1. A full motion blur might need a higher number of motionblur_samples.",
-    )
-    parser.add_argument(
-        "--weather_motionblur_samples",
-        default=10,
-        type=int,
-        help="the number of flakes that is drawn per blurred flake. More samples are needed for faster objects or a larger motionblur_scale.",
-    )
-    # GMA/Raft model iters
-    parser.add_argument(
-        "--weather_model_iters",
-        default=32,
-        type=int,
-        help="the number of iters for gma/raft model, to override the ptlflow setting.",
-    )
-    parser.add_argument(
-        "--weather_flakesize_max",
-        default=71,
-        type=int,
-        help="the maximal size for particles in pixels.",
-    )
-    parser.add_argument(
-        "--weather_depth_decay",
-        default=10,
-        type=float,
-        help="a decay factor for the particle template size by depth. The particle template size is 1/depth/depth_decay.",
-    )
-    parser.add_argument(
-        "--weather_constant_transparency",
-        default=0,
-        type=float,
-        help="if set to a value != 0, this is the default transparency for all initialized particles. Otherwise, the transparency is a hat-function that reaches its peak at a depth of 2.",
-    )
-    parser.add_argument(
-        "--weather_motion_y",
-        default=0.0,
-        type=float,
-        help="the motion in y-direction for all particles between frames.",
-    )
-    parser.add_argument(
-        "--weather_motion_random_scale",
-        default=0.0,
-        type=float,
-        help="randomizes the magnitude of the particle motion relative to the motion vector length. By setting to 0.5, the motion vector can be longer or smaller up to half its length. (default=0.0)",
-    )
-    parser.add_argument(
-        "--weather_motion_random_angle",
-        default=0.0,
-        type=float,
-        help="maximal random offset angle for the particle motion in degree. (default=0.0, max=180)",
-    )
-    parser.add_argument(
-        "--weather_flake_r",
-        default=255,
-        type=int,
-        help="the R value for the particle RGB",
-    )
-    parser.add_argument(
-        "--weather_flake_g",
-        default=255,
-        type=int,
-        help="the G value for the particle RGB",
-    )
-    parser.add_argument(
-        "--weather_flake_b",
-        default=255,
-        type=int,
-        help="the B value for the particle RGB",
-    )
-    parser.add_argument(
-        "--weather_flake_random_h",
-        default=0,
-        type=float,
-        help="the upper bound for HSL color Hue (H) randomization. Hue runs from 0° to 360°, hence values >= 180 will give fully randomized hues.",
-    )
-    parser.add_argument(
-        "--weather_flake_random_l",
-        default=0,
-        type=float,
-        help="the upper bound for HSL color Lightness (L) randomization. Lightness runs from 0 (black) over 0.5 (color) to 1 (white).",
-    )
-    parser.add_argument(
-        "--weather_frame_per_scene",
-        default=0,
-        type=int,
-        help="the number of optimization scenes per sintel-sequence (if 0, all scenes per sequence are taken).",
-    )
-    parser.add_argument(
-        "--weather_no_flake_dat",
-        default=True,
-        type=bool_or_rgb,
-        help="if this flag is used, no data about the particle (positions, flakes, transparencies) will be stored.",
-    )
-    parser.add_argument(
-        "--weather_lr",
-        type=float,
-        default=0.00001,
-        help="learning rate for updating the distortion via stochastic gradient descent or Adam. Default: 0.001.",
-    )
-    parser.add_argument(
-        "--weather_unregistered_artifacts",
-        default=True,
-        type=bool_or_rgb,
-        help="if True, artifacts are saved to the output folder but not registered. Saves time and memory during training.",
-    )
-    parser.add_argument('--weather_num_flakes', default=1000, type=int,
-        help="the number of particles that will be generated initially.")
     return parser
 
 
-def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBench) -> None:
-    """Perform the validation and write results to args.output_path.
-
-    Parameters
-    ----------
-    args : Namespace
-        Arguments to configure the attack, validation and logging.
-    model : BaseModel
-        The model to be used for validation.
-    data_module : FlowDataModule
-        The data module used for validation. The val_dataset must be defined.
-
-    Returns
-    -------
-    pd.DataFrame
-        A DataFrame with the metric results.
-
-    See Also
-    --------
-    ptlflow.models.base_model.base_model.BaseModel : The parent class of the available models.
-    """
+def attack_single(
+    args: Namespace,
+    model: BaseModel,
+    data_module: FlowDataModuleFlowBench,
+    attack: BaseAttack,
+) -> None:
     model.eval()
     if torch.cuda.is_available():
         model = model.cuda()
@@ -685,107 +242,94 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBen
     iteration_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
     iteration_data.append(("model", args.model.as_dict()))
     iteration_data.append(("checkpoint", args.ckpt_path))
-    attack_args_parser = AttackArgumentParser(args)
 
-    for attack_args in attack_args_parser:
-        for key, value in attack_args.items():
-            if "_" in key:
-                key = key.split("_")[1]
-            if isinstance(value, float):
-                value = round(value, 4)
-            output_data.append((key, value))
-            iteration_data.append((key, value))
-        logger.info(f"Attack arguments: {attack_args}")
-        for dataset_name, dl in dataloaders.items():
-            metrics_mean, iteration_metrics_mean = attack_one_dataloader(
-                args, attack_args, model, dl, dataset_name, data_module=data_module
-            )
-
-            end_time = datetime.now()
-            output_data.append(("end_time", end_time.strftime("%Y-%m-%d %H:%M:%S")))
-            iteration_data.append(("end_time", end_time.strftime("%Y-%m-%d %H:%M:%S")))
-            time_difference = end_time - start_time
-            hours = time_difference.seconds // 3600
-            minutes = (time_difference.seconds % 3600) // 60
-            seconds = time_difference.seconds % 60
-            time_difference_str = "{:02}:{:02}:{:02}".format(hours, minutes, seconds)
-            output_data.append(("duration", time_difference_str))
-            iteration_data.append(("duration", time_difference_str))
-
-            output_data.append(("dataset", dataset_name))
-            iteration_data.append(("dataset", dataset_name))
-            for k in metrics_mean.keys():
-                output_data.append((k, metrics_mean[k]))
-            for k in iteration_metrics_mean.keys():
-                iteration_data.append((k, iteration_metrics_mean[k]))
-
-            args.output_path.mkdir(parents=True, exist_ok=True)
-
-            output_dict = {}
-            for key, value in output_data:
+    for key, value in attack.hparams_initial.items():
+        if "_" in key:
+            key = key.split("_")[1]
+        if isinstance(value, float):
+            value = round(value, 4)
+        output_data.append((key, value))
+        iteration_data.append((key, value))
+    logger.info(f"Attack arguments: {args.attack_obj}")
+    for dataset_name, dl in dataloaders.items():
+        metrics_mean, iteration_metrics_mean = attack_one_dataloader(
+            args, attack, model, dl, dataset_name, data_module=data_module
+        )
+        end_time = datetime.now()
+        output_data.append(("end_time", end_time.strftime("%Y-%m-%d %H:%M:%S")))
+        iteration_data.append(("end_time", end_time.strftime("%Y-%m-%d %H:%M:%S")))
+        time_difference = end_time - start_time
+        hours = time_difference.seconds // 3600
+        minutes = (time_difference.seconds % 3600) // 60
+        seconds = time_difference.seconds % 60
+        time_difference_str = "{:02}:{:02}:{:02}".format(hours, minutes, seconds)
+        output_data.append(("duration", time_difference_str))
+        iteration_data.append(("duration", time_difference_str))
+        output_data.append(("dataset", dataset_name))
+        iteration_data.append(("dataset", dataset_name))
+        for k in metrics_mean.keys():
+            output_data.append((k, metrics_mean[k]))
+        for k in iteration_metrics_mean.keys():
+            iteration_data.append((k, iteration_metrics_mean[k]))
+        args.output_path.mkdir(parents=True, exist_ok=True)
+        output_dict = {}
+        for key, value in output_data:
+            if "val" in key:
+                output_dict.setdefault("metrics", {})[key.split("/")[1]] = value
+            else:
+                output_dict[key] = value
+        output_filename = args.output_path / f"metrics_{args.data.val_dataset}.json"
+        if os.path.exists(output_filename) and not overwrite_flag:
+            with open(output_filename, "r") as json_file:
+                metrics = json.load(json_file)
+        else:
+            metrics = {"experiments": []}
+        metrics["experiments"].append(output_dict)
+        with open(output_filename, "w") as json_file:
+            print("metrics", metrics)
+            json.dump(metrics, json_file, indent=4)
+        if iteration_metrics_mean:
+            iteration_output_dict = {}
+            for key, value in iteration_data:
                 if "val" in key:
-                    output_dict.setdefault("metrics", {})[key.split("/")[1]] = value
+                    iteration_output_dict.setdefault("metrics", {})[
+                        key.split("/")[1]
+                    ] = value
                 else:
-                    output_dict[key] = value
-            output_filename = args.output_path / f"metrics_{args.data.val_dataset}.json"
-
+                    iteration_output_dict[key] = value
+            output_filename = (
+                args.output_path / f"iteration_metrics_{args.data.val_dataset}.json"
+            )
             if os.path.exists(output_filename) and not overwrite_flag:
                 with open(output_filename, "r") as json_file:
                     metrics = json.load(json_file)
             else:
                 metrics = {"experiments": []}
-
-            metrics["experiments"].append(output_dict)
-
+            metrics["experiments"].append(iteration_output_dict)
+            
+            # Check that metrics is serializable before writing an incomplete json
+            try:
+                json.dumps(metrics, indent=4)
+            except Exception as e:
+                logger.error(f"Exception {e}")
+                print('Tried to serialize:', metrics)
+                print(type(metrics['experiemnts'][0]['model']))
+                raise e
             with open(output_filename, "w") as json_file:
                 json.dump(metrics, json_file, indent=4)
-
-            if iteration_metrics_mean:
-                iteration_output_dict = {}
-                for key, value in iteration_data:
-                    if "val" in key:
-                        iteration_output_dict.setdefault("metrics", {})[
-                            key.split("/")[1]
-                        ] = value
-                    else:
-                        iteration_output_dict[key] = value
-                output_filename = (
-                    args.output_path / f"iteration_metrics_{args.data.val_dataset}.json"
-                )
-
-                if os.path.exists(output_filename) and not overwrite_flag:
-                    with open(output_filename, "r") as json_file:
-                        metrics = json.load(json_file)
-                else:
-                    metrics = {"experiments": []}
-
-                metrics["experiments"].append(iteration_output_dict)
+            # Write args to file (If args is a PTLFlowCLI.config, this contains all CLI arguments including defaults)
+            config_path = args.output_path / 'full_configs' / start_time.strftime("%Y%m%d_%H%M%S") / "config.yaml"
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
                 
-                # Check that metrics is serializable before writing an incomplete json
-                try:
-                    json.dumps(metrics, indent=4)
-                except Exception as e:
-                    logger.error(f"Exception {e}")
-                    print('Tried to serialize:', metrics)
-                    print(type(metrics['experiemnts'][0]['model']))
-                    raise e
-
-                with open(output_filename, "w") as json_file:
-                    json.dump(metrics, json_file, indent=4)
-
-                # Write args to file (If args is a PTLFlowCLI.config, this contains all CLI arguments including defaults)
-                config_path = args.output_path / 'full_configs' / start_time.strftime("%Y%m%d_%H%M%S") / "config.yaml"
-                os.makedirs(os.path.dirname(config_path), exist_ok=True)
-                    
-                with open(config_path, "w") as f:
-                    yaml.dump(args, f)
-                    print(f'config saved to {config_path}')
+            with open(config_path, "w") as f:
+                yaml.dump(args, f)
+                print(f'config saved to {config_path}')
 
 
 @torch.enable_grad()
 def attack_one_dataloader(
     args: Namespace,
-    attack_args: Dict[str, List[object]],
+    attack_args: BaseAttack,
     model: BaseModel,
     dataloader: DataLoader,
     dataloader_name: str,
@@ -818,17 +362,21 @@ def attack_one_dataloader(
 
     metrics_sum = {}
     iteration_metrics_sum = {}
-    if attack_args["attack"] == "weather":
-        attack_args["model"] = args.model
+    # if attack_args["attack"] == "weather":
+    #     attack_args["model"] = args.model
 
-    if attack_args["attack"] == "3dcc":
-        assert data_module is not None, "The attack 3DCC requires the data_module to be passed."
-        dataloader = get_dataset_3DCC(
-            data_module,
-            dataloader_name,
-            attack_args["tdcc_corruption"],
-            attack_args["tdcc_intensity"],
-        )
+    if attack_args.precomputed:
+        dataloader = attack_args.preprocess_dataloader(dataloader_name, data_module)
+        
+    # if attack_args["attack"] == "3dcc":
+    #     assert data_module is not None, "The attack 3DCC requires the data_module to be passed."
+    #     dataloader = get_dataset_3DCC(
+    #         data_module,
+    #         dataloader_name,
+    #         attack_args["tdcc_corruption"],
+    #         attack_args["tdcc_intensity"],
+    #     )
+
     metrics_individual = None
     if args.write_individual_metrics:
         metrics_individual = {"filename": [], "epe": [], "flall": []}
@@ -852,76 +400,52 @@ def attack_one_dataloader(
                 cuda=torch.cuda.is_available(),
                 fp16=args.fp16,
             )
+            if attack_args.precomputed:
+                inputs["inputs_perturbed"] = io_adapter.prepare_inputs(inputs=inputs["inputs_perturbed"], image_only=True)
             inputs = io_adapter.prepare_inputs(inputs=inputs, image_only=True)
             inputs["prev_preds"] = prev_preds
 
             if inputs["images"].max() > 1.0:
+                raise ValueError("ptlflow normalizes RGB range to be <= 1.0")
                 attack_args["attack_epsilon"] = attack_args["attack_epsilon"] * 255
                 attack_args["attack_alpha"] = attack_args["attack_alpha"] * 255
             has_ground_truth = True
             targeted_inputs = None
 
             with torch.no_grad():
+
                 orig_preds = model(inputs)
             torch.cuda.empty_cache()
 
-            if attack_args["attack_targeted"] or attack_args["attack"] == "pcfa" or attack_args["attack"] == "weather":
-                if attack_args["attack_target"] == "negative":
-                    targeted_flow_tensor = -orig_preds["flows"]
-                else:
-                    targeted_flow_tensor = torch.zeros_like(orig_preds["flows"])
+            if attack_args.targeted:
+                targeted_flow_tensor = attack_args.make_target(inputs=inputs, preds=orig_preds)
+
                 if not "flows" in inputs:
                     inputs["flows"] = targeted_flow_tensor
                     has_ground_truth = False
 
                 targeted_inputs = inputs.copy()
                 targeted_inputs["flows"] = targeted_flow_tensor
-            # for logging
-            if attack_args["attack"] == "none":
-                targeted_inputs = inputs.copy()
+            # # for logging
+            # if attack_args["attack"] == "none":
+            #     targeted_inputs = inputs.copy()
 
             iteration_metrics = {}
             # pdb.set_trace()
-            match attack_args["attack"]:  # Commit adversarial attack
-                case "fgsm":
-                    (
-                        preds,
-                        perturbed_inputs,
-                    ) = fgsm(attack_args, inputs, model, targeted_inputs)
-                case "pgd":
-                    preds, perturbed_inputs, iteration_metrics = bim_pgd_cospgd(
-                        attack_args, inputs, model, targeted_inputs, orig_preds
-                    )
-                case "cospgd":
-                    preds, perturbed_inputs, iteration_metrics = bim_pgd_cospgd(
-                        attack_args, inputs, model, targeted_inputs, orig_preds
-                    )
-                case "bim":
-                    preds, perturbed_inputs, iteration_metrics = bim_pgd_cospgd(
-                        attack_args, inputs, model, targeted_inputs, orig_preds
-                    )
-                case "apgd":
-                    preds, perturbed_inputs = apgd(
-                        attack_args, inputs, model, targeted_inputs
-                    )
-                case "fab":
-                    preds, perturbed_inputs = fab(
-                        attack_args, inputs, model, targeted_inputs
-                    )
-                case "pcfa":
-                    preds, perturbed_inputs, iteration_metrics = pcfa(
-                        attack_args, inputs, model, targeted_inputs
-                    )
-                case "common_corruptions":
-                    preds, perturbed_inputs = common_corrupt(attack_args, inputs, model)
-                case "none":
-                    preds = orig_preds
-                case "3dcc":
-                    preds = orig_preds
-                case "weather":
-                    preds, perturbed_inputs = weather(
-                        attack_args, model, targeted_inputs, i, args.output_path
-                    )
+            if isinstance(attack_args, BaseAttack):
+                attack_obj = attack_args
+                outputs = attack_obj({'inputs': inputs, 'model': model, 'targeted_inputs': targeted_inputs})
+
+                perturbed_inputs = outputs['perturbed_inputs']
+                if "preds" in outputs:
+                    preds = outputs['preds']
+                else:
+                    preds = model(perturbed_inputs)
+
+                iteration_metrics = outputs.get('iteration_metrics', {})
+
+            else:
+                raise ValueError("expecting attack as object")
 
             for key in preds:
                 if torch.is_tensor(preds[key]):
@@ -929,10 +453,9 @@ def attack_one_dataloader(
             for key in inputs:
                 if torch.is_tensor(inputs[key]):
                     inputs[key] = inputs[key].detach()
-            if attack_args["attack"] != "none" and attack_args["attack"] != "3dcc":
-                for key in perturbed_inputs:
-                    if torch.is_tensor(perturbed_inputs[key]):
-                        perturbed_inputs[key] = perturbed_inputs[key].detach()
+            for key in perturbed_inputs:
+                if torch.is_tensor(perturbed_inputs[key]):
+                    perturbed_inputs[key] = perturbed_inputs[key].detach()
             for key in iteration_metrics:
                 if torch.is_tensor(iteration_metrics[key]):
                     iteration_metrics[key] = iteration_metrics[key].detach()
@@ -952,12 +475,11 @@ def attack_one_dataloader(
             inputs = io_adapter.unscale(inputs, image_only=True)
             preds = io_adapter.unscale(preds)
 
-            if attack_args["attack"] != "none" and attack_args["attack"] != "3dcc":
-                perturbed_inputs = io_adapter.unscale(perturbed_inputs, image_only=True)
-                if attack_args["attack_targeted"] or attack_args["attack"] == "pcfa":
-                    targeted_inputs = io_adapter.unscale(
-                        targeted_inputs, image_only=True
-                    )
+            perturbed_inputs = io_adapter.unscale(perturbed_inputs, image_only=True)
+            if attack_args.targeted:
+                targeted_inputs = io_adapter.unscale(
+                    targeted_inputs, image_only=True
+                )
 
             if inputs["flows"].shape[1] > 1 and args.seq_val_mode != "all":
                 if args.seq_val_mode == "first":
@@ -976,7 +498,7 @@ def attack_one_dataloader(
                     elif isinstance(val, torch.Tensor) and len(val.shape) == 5:
                         inputs[key] = val[:, k : k + 1]
 
-            if attack_args["attack_targeted"] or attack_args["attack"] == "pcfa":
+            if attack_args.targeted:
 
                 metrics = model.val_metrics[0](preds, targeted_inputs)
 
@@ -1039,7 +561,7 @@ def attack_one_dataloader(
                     cosine_similarity(get_flow_tensors(preds), get_flow_tensors(inputs))
                 )
 
-                if attack_args["attack"] == "none":
+                if args["compare_to_targets"]:
                     targeted_flow_tensor_negative = -orig_preds["flows"].clone()
                     targeted_flow_tensor_zero = torch.zeros_like(orig_preds["flows"])
                     loss_initial_neg = criterion.loss(
@@ -1086,7 +608,8 @@ def attack_one_dataloader(
                     metrics["val/epe_ground_truth_to_zero"] = metrics_ground_truth_zero[
                         "val/epe"
                     ]
-            if attack_args["attack"] != "none" and attack_args["attack"] != "3dcc":
+            if True:
+                # compute perturbation size
                 adv_image1, adv_image2 = get_image_tensors(perturbed_inputs)
                 image1, image2 = get_image_tensors(inputs)
                 delta1 = adv_image1 - image1
@@ -1126,35 +649,21 @@ def attack_one_dataloader(
                 metrics_individual["epe"].append(metrics["val/epe"].item())
                 metrics_individual["flall"].append(metrics["val/flall"].item())
 
-            if attack_args["attack"] != "none" and attack_args["attack"] != "3dcc":
-                generate_outputs(
-                    args,
-                    preds,
-                    dataloader_name,
-                    i,
-                    inputs.get("meta"),
-                    perturbed_inputs,
-                    attack_args,
-                )
-            elif attack_args["attack"] == "3dcc":
-                generate_outputs(
-                    args,
-                    preds,
-                    dataloader_name,
-                    i,
-                    inputs.get("meta"),
-                    attack_args=attack_args,
-                )
-            else:
-                generate_outputs(args, preds, dataloader_name, i, inputs.get("meta"))
+            generate_outputs(args,
+                             preds,
+                             dataloader_name,
+                             i,
+                             inputs.get("meta"),
+                             perturbed_inputs,
+                             dict(attack_args.hparams_initial),
+                             )
             if args.max_samples is not None and i >= (args.max_samples - 1):
                 break
 
             del preds
             del inputs
             del iteration_metrics
-            if attack_args["attack"] != "none" and attack_args["attack"] != "3dcc":
-                del perturbed_inputs
+            del perturbed_inputs
             torch.cuda.empty_cache()
 
     if args.write_individual_metrics:
@@ -1165,12 +674,14 @@ def attack_one_dataloader(
         )
 
     metrics_mean = {}
+    n = i + 1
     for k, v in metrics_sum.items():
-        metrics_mean[k] = v / len(dataloader)
+        metrics_mean[k] = v / n
+    metrics_mean['num_samples'] = n
 
     iteration_metrics_mean = {}
     for k, v in iteration_metrics_sum.items():
-        iteration_metrics_mean[k] = v / len(dataloader)
+        iteration_metrics_mean[k] = v / n
 
     return metrics_mean, iteration_metrics_mean
 
@@ -1344,7 +855,8 @@ def _write_to_file(
 if __name__ == "__main__":
     parser = _init_parser()
     
-    cli = PTLFlowCLI(
+    cli = FlowBenchCLI(
+        attack_class=BaseAttack,
         model_class=RegisteredModel,
         subclass_mode_model=True,
         datamodule_class=FlowDataModuleFlowBench,
@@ -1360,12 +872,12 @@ if __name__ == "__main__":
 
     if cfg.ckpt_path is not None:
         model_id += f"_{Path(cfg.ckpt_path).stem}"
-    if cfg.max_forward_side is not None:
-        model_id += f"_maxside{cfg.max_forward_side}"
-    if cfg.scale_factor is not None:
-        model_id += f"_scale{cfg.scale_factor}"
-    if cfg.model.init_args.warm_start:
-        model_id += f"_warm"
+    # if cfg.max_forward_side is not None:
+    #     model_id += f"_maxside{cfg.max_forward_side}"
+    # if cfg.scale_factor is not None:
+    #     model_id += f"_scale{cfg.scale_factor}"
+    # if cfg.model.init_args.warm_start:
+    #     model_id += f"_warm"
     cfg.output_path = Path(cfg.output_path) / model_id
     Path(cfg.output_path).mkdir(parents=True, exist_ok=True)
 
@@ -1374,4 +886,6 @@ if __name__ == "__main__":
     model = cli.model
     model = restore_model(model, cfg.ckpt_path)
     
-    metrics_df = attack(cfg, model, cli.datamodule)
+    print("cfg.attack", '\n', cli.attack)
+    
+    metrics_df = attack_single(cfg, model, cli.datamodule, cli.attack)
