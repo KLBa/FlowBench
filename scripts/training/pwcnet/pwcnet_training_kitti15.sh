@@ -11,4 +11,4 @@
 
 cd ../../../ptlflow_attacked
 
-python train.py pwcnet --train_dataset kitti-15-train --val_dataset kitti-15-val --pretrained_ckpt things --train_crop_size 896 320 --lr 0.00000001 --train_batch_size 4 --max_epochs 10 --clear_train_state
+python train.py pwcnet --train_dataset kitti-15-train --data.val_dataset kitti-15-val --ckpt_path things --train_crop_size 896 320 --lr 0.00000001 --train_batch_size 4 --max_epochs 10 --clear_train_state

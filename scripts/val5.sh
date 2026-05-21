@@ -14,6 +14,6 @@
 
 cd ..
 
-python attacks.py flowformer++ --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py gmflow --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py gmflownet --pretrained_ckpt kitti --val_dataset kitti-2015
+python -m flowbench.attacks --model flowformer++ --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model gmflow --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model gmflownet --ckpt_path kitti --data.val_dataset kitti-2015

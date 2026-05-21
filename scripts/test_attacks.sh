@@ -12,15 +12,15 @@
 
 echo TestAttacks
 
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack bim --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack bim --attack_targeted True --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack fgsm --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack fgsm --attack_targeted True --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack apgd --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack apgd --attack_targeted True --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack cospgd --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack cospgd --attack_targeted True --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack pgd --attack_iterations 5
-python attacks.py raft --pretrained_ckpt chairs --val_dataset chairs-val --attack pgd --attack_targeted True --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack bim --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack bim --attack_targeted True --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack fgsm --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack fgsm --attack_targeted True --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack apgd --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack apgd --attack_targeted True --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack cospgd --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack cospgd --attack_targeted True --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack pgd --attack_iterations 5
+python -m flowbench.attacks --model raft --ckpt_path chairs --data.val_dataset chairs-val --attack pgd --attack_targeted True --attack_iterations 5
 

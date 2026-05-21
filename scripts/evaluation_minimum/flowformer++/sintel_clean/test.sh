@@ -23,4 +23,4 @@ jobnum=0
 
 cd ../../../../
 
-python attacks_flowformer.py flowformer --val_dataset kitti-2015 --pretrained_ckpt kitti
+python attacks_flowformer.py flowformer --data.val_dataset kitti-2015 --ckpt_path kitti

@@ -14,6 +14,6 @@
 
 cd ..
 
-python attacks.py maskflownet --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py flow1d --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py flowformer --pretrained_ckpt kitti --val_dataset kitti-2015
+python -m flowbench.attacks --model maskflownet --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model flow1d --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model flowformer --ckpt_path kitti --data.val_dataset kitti-2015

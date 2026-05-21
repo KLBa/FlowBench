@@ -14,6 +14,6 @@
 
 cd ..
 
-python attacks.py irr --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py llaflow --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py rapidflow --pretrained_ckpt kitti --val_dataset kitti-2015
+python -m flowbench.attacks --model irr --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model llaflow --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model rapidflow --ckpt_path kitti --data.val_dataset kitti-2015

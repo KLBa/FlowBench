@@ -57,10 +57,10 @@ do
                                 if [[ $SLURM_ARRAY_TASK_ID -eq $jobnum ]]
                                 then
                                     echo "Running job $model $checkpoint $dataset $attack $iteration $norm $alpha $epsilon $targeted $target $jobnum"
-                                    python attacks.py \
+                                    python -m flowbench.attacks --model \
                                         $model \
-                                        --pretrained_ckpt $checkpoint \
-                                        --val_dataset $dataset \
+                                        --ckpt_path $checkpoint \
+                                        --data.val_dataset $dataset \
                                         --attack $attack \
                                         --attack_iterations $iteration \
                                         --attack_norm $norm \
@@ -77,10 +77,10 @@ do
                             if [[ $SLURM_ARRAY_TASK_ID -eq $jobnum ]]
                             then
                                 echo "Running job $model $checkpoint $dataset $attack $iteration $norm $alpha $epsilon $targeted $target $jobnum"
-                                python attacks.py \
+                                python -m flowbench.attacks --model \
                                     $model \
-                                    --pretrained_ckpt $checkpoint \
-                                    --val_dataset $dataset \
+                                    --ckpt_path $checkpoint \
+                                    --data.val_dataset $dataset \
                                     --attack $attack \
                                     --attack_iterations $iteration \
                                     --attack_norm $norm \

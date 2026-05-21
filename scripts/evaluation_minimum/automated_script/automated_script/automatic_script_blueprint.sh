@@ -49,7 +49,7 @@ do
         export CUDA_VISIBLE_DEVICES=$i
 
         # Construct the Python command dynamically, excluding 'nan' values
-        python_command="python attacks.py $model --pretrained_ckpt $pretrained_ckpt --val_dataset $val_dataset --attack $attack"
+        python_command="python -m flowbench.attacks --model $model --ckpt_path $pretrained_ckpt --data.val_dataset $val_dataset --attack $attack"
 
         # Only add the optional arguments if they are non-empty and not 'nan'
         [[ -n "$attack_targeted" && "$attack_targeted" != "nan" ]] && python_command+=" --attack_targeted $attack_targeted"

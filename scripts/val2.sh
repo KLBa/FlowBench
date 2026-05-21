@@ -14,6 +14,6 @@
 
 cd ..
 
-python attacks.py ccmr --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py craft --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py csflow --pretrained_ckpt kitti --val_dataset kitti-2015
+python -m flowbench.attacks --model ccmr --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model craft --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model csflow --ckpt_path kitti --data.val_dataset kitti-2015

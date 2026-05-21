@@ -13,10 +13,10 @@ echo "Running job $SLURM_JOB_NAME using $SLURM_JOB_CPUS_PER_NODE cpus per node w
 start=`date +%s`
 
 cd ..
-python attacks.py \
+python -m flowbench.attacks --model \
     $1 \
-    --pretrained_ckpt $2 \
-    --val_dataset $3 \
+    --ckpt_path $2 \
+    --data.val_dataset $3 \
     --attack $4 \
     --attack_iterations $5 \
     --attack_norm $6 \

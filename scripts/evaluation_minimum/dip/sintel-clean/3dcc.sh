@@ -29,10 +29,10 @@ do
         if [[ $SLURM_ARRAY_TASK_ID -eq $jobnum ]]
         then
             echo "Running job $model $checkpoint $dataset $attack $tdcc_corruption $tdcc_intensity $jobnum"
-            python attacks.py \
+            python -m flowbench.attacks --model \
                 $model \
-                --pretrained_ckpt $checkpoint \
-                --val_dataset $dataset \
+                --ckpt_path $checkpoint \
+                --data.val_dataset $dataset \
                 --attack $attack \
                 --3dcc_corruption $tdcc_corruption \
                 --3dcc_intensity $tdcc_intensity \

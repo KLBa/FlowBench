@@ -14,6 +14,6 @@
 
 cd ..
 
-python attacks.py dicl --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py dip --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py fastflownet --pretrained_ckpt kitti --val_dataset kitti-2015
+python -m flowbench.attacks --model dicl --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model dip --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model fastflownet --ckpt_path kitti --data.val_dataset kitti-2015

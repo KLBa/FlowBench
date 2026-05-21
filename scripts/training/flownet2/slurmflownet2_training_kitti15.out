@@ -1,7 +1,7 @@
 /pfs/work7/workspace/scratch/ma_jcaspary-team_project_fss2024/miniconda3/envs/ptl/lib/python3.10/site-packages/torchvision/io/image.py:13: UserWarning: Failed to load image Python extension: libnvjpeg.so.11: cannot open shared object file: No such file or directory
   warn(f"Failed to load image Python extension: {e}")
 [rank: 0] Global seed set to 1234
-05/13/2024 15:55:02 - WARNING: --val_dataset is not set. It will be set as sintel-clean+sintel-final+kitti-2015. If you want to skip validation, then set --val_dataset none.
+05/13/2024 15:55:02 - WARNING: --data.val_dataset is not set. It will be set as sintel-clean+sintel-final+kitti-2015. If you want to skip validation, then set --data.val_dataset none.
 05/13/2024 15:55:03 - INFO: Loading 1041 samples from Sintel_clean dataset.
 05/13/2024 15:55:03 - INFO: Loading 1041 samples from Sintel_final dataset.
 05/13/2024 15:55:03 - INFO: Loading 200 samples from KITTI_2015 dataset.

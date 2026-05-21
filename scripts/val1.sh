@@ -14,6 +14,6 @@
 
 cd ..
 
-python attacks.py raft --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py gma --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py rpknet --pretrained_ckpt kitti --val_dataset kitti-2015
+python -m flowbench.attacks --model raft --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model gma --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model rpknet --ckpt_path kitti --data.val_dataset kitti-2015

@@ -14,6 +14,6 @@
 
 cd ..
 
-python attacks.py scopeflow --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py skflow --pretrained_ckpt kitti --val_dataset kitti-2015
-python attacks.py starflow --pretrained_ckpt kitti --val_dataset kitti-2015
+python -m flowbench.attacks --model scopeflow --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model skflow --ckpt_path kitti --data.val_dataset kitti-2015
+python -m flowbench.attacks --model starflow --ckpt_path kitti --data.val_dataset kitti-2015

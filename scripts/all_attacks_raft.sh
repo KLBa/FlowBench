@@ -12,7 +12,7 @@
 
 echo TestAttacks
 
-python attacks.py raft --pretrained_ckpt things --val_dataset kitti-2012+kitti-2015+sintel-clean+sintel-final --attack bim fgsm cospgd --attack_iterations 3 5 10 --attack_targeted False True
+python -m flowbench.attacks --model raft --ckpt_path things --data.val_dataset kitti-2012+kitti-2015+sintel-clean+sintel-final --attack bim fgsm cospgd --attack_iterations 3 5 10 --attack_targeted False True
 
 
 

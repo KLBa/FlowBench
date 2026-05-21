@@ -93,10 +93,10 @@ do
         echo "Running job $model $checkpoint $dataset $attack $iteration $norm $alpha $epsilon $targeted $target on GPU $i (job $jobnum)"
         
         # Run the Python script with the corresponding parameters in the background (&)
-        python attacks.py \
+        python -m flowbench.attacks --model \
             $model \
-            --pretrained_ckpt $checkpoint \
-            --val_dataset $dataset \
+            --ckpt_path $checkpoint \
+            --data.val_dataset $dataset \
             --attack $attack \
             --attack_iterations $iteration \
             --attack_norm $norm \
