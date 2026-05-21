@@ -31,7 +31,7 @@ def replace_images_dic(
     image_2: torch.Tensor,
     clone: bool = False,
 ):
-    image_pair_tensor = torch.torch.cat((image_1, image_2)).unsqueeze(0)
+    image_pair_tensor = torch.cat((image_1, image_2)).unsqueeze(0)
     if clone:
         output_dic = copy.deepcopy(input_dic)
         output_dic["images"] = image_pair_tensor
