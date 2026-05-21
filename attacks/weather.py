@@ -44,11 +44,6 @@ def weather(
     torch.cuda.empty_cache()
     print("Print all keys", attack_args)
 
-    # substitude model specific args
-    if attack_args["model"] in ("gma", "raft"):
-        model.args.iters = attack_args["weather_model_iters"]
-
-
     # Define what device we are using
     if not torch.cuda.is_available():
         device = torch.device("cpu")
