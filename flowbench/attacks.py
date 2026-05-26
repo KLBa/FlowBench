@@ -753,6 +753,7 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBen
                     output_dict[key] = value
 
             if os.path.exists(output_filename) and not overwrite_flag:
+                logger.info(f"Load {output_filename}")
                 with open(output_filename, "r") as json_file:
                     metrics = json.load(json_file)
             else:
@@ -904,6 +905,11 @@ def attack_one_dataloader(
                 targeted_inputs = inputs.copy()
 
             iteration_metrics = {}
+
+            torch.save(inputs, 'outputs/debugging/inputs.pth')
+            torch.save(model, 'outputs/debugging/model.pth')
+            torch.save(targeted_inputs, 'outputs/debugging/targeted_inputs.pth')
+
             # pdb.set_trace()
             match attack_args["attack"]:  # Commit adversarial attack
                 case "fgsm":
@@ -945,6 +951,14 @@ def attack_one_dataloader(
                     preds, perturbed_inputs = weather(
                         attack_args, model, targeted_inputs, i, args.output_path
                     )
+
+            torch.save(preds, 'outputs/debugging/preds.pth')
+            if attack_args["attack"] != "none" and attack_args["attack"] != "3dcc":
+                torch.save(perturbed_inputs, 'outputs/debugging/perturbed_inputs.pth')
+            else:
+                torch.save(inputs, 'outputs/debugging/perturbed_inputs.pth')
+            if iteration_metrics:
+                torch.save(iteration_metrics, 'outputs/debugging/iteration_metrics.pth')
 
             for key in preds:
                 if torch.is_tensor(preds[key]):
@@ -1188,15 +1202,19 @@ def attack_one_dataloader(
             Path(args.output_path) / f"{dataloader_name}_epe_flall.csv", index=None
         )
 
+
+    n = i + 1
+    if n != len(dataloader):
+        logger.warning(f"Normalizing by num_samples = {n}. Number of samples is {len(dataloader)}. "
+                       f"If you set --max_samples {n}, you can ignore this warning. Otherwise, the normalization is broken.")
     metrics_mean = {}
     for k, v in metrics_sum.items():
-        metrics_mean[k] = v / len(dataloader)
-    
-    metrics_mean["num_samples"] = num_samples
+        metrics_mean[k] = v / n
+    metrics_mean['num_samples'] = n
 
     iteration_metrics_mean = {}
     for k, v in iteration_metrics_sum.items():
-        iteration_metrics_mean[k] = v / len(dataloader)
+        iteration_metrics_mean[k] = v / n
 
     return metrics_mean, iteration_metrics_mean
 
