@@ -19,6 +19,7 @@ def apgd(
     if attack_args["attack_targeted"]:
         attack = APGD(
             model,
+            norm=norm,
             eps=attack_args["attack_epsilon"],
             loss=attack_args["attack_loss"],
             verbose=False,

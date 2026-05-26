@@ -281,7 +281,7 @@ class InputModel(nn.Module):
                 * (torch.tanh(image2) + (1 - self.eps_box))
             )
 
-        # Clipping case, which will only clip something if change of variables was not defined. otherwise, the change of variables has already brought the iamges into the range [0,1]
+        # Clipping case, which will only clip something if change of variables was not defined. Otherwise, the change of variables has already brought the images into the range [0,1].
         image1 = torch.clamp(image1, 0.0, 1.0)
         image2 = torch.clamp(image2, 0.0, 1.0)
 
