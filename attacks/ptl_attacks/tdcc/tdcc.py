@@ -1,7 +1,8 @@
 
 from typing import Any, Dict
 from loguru import logger
-from torch.utils.data import DataLoader, Dataset
+
+from attacks.ptl_attacks.registry import register_attack
 
 from ..base_attack.base_attack import BaseAttack
 
@@ -19,7 +20,7 @@ class CommonCorruptions3D(BaseAttack):
         self.tdcc_intensity = tdcc_intensity
         
         if not self.precomputed:
-            raise NotImplementedError()
+            raise NotImplementedError("3D common corruptions must be pre-computed. Define the path {dataset_name}_3DCC in datasets.yaml")
         self.save_hyperparameters()
 
     def forward(self, inputs: Dict[str, Any]):
@@ -47,3 +48,8 @@ class CommonCorruptions3D(BaseAttack):
         data_module.val_dataset_parsed = None
         data_module.setup("validate")
         return data_module.val_dataloader()[0]
+
+
+@register_attack
+class cc3d(CommonCorruptions3D):
+    pass

@@ -48,18 +48,18 @@ class FlowDataModuleFlowBench(FlowDataModule):
 
         is_tdcc = False
         attach = False
-        for v in args_tdcc:
-            v = v.replace('flowbench_', '')
+        for v_ in args_tdcc:
+            v = v_.replace('flowbench_', '')
             if 'tdcc_' in v:
                 is_tdcc = True
                 v = v.replace('tdcc_', '')
                 tdcc_intensity = v[0]
                 assert v[1] == '_'
                 tdcc_corruption = v[2:]
-            if v == 'attach':
+            elif v == 'attach':
                 attach = True
             else:
-                raise ValueError(f"Invalid arg: {v}")
+                raise ValueError(f"Invalid arg: {v_}")
 
         if is_tdcc:
             dataset_tdcc = KittiDataset3DCC(

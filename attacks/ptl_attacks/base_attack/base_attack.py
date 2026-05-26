@@ -17,13 +17,22 @@ class BaseAttack(LightningModule):
         self.targeted = targeted
         self.target = target
         
+        self.attack_targeted = targeted # for compability with old parameter naming
+        self.attack_target = target # for compability with old parameter naming
+        if self.targeted and self.target is None:
+            raise ValueError("You must pass a target for the targeted attack. Choose from 'negative' and 'zero'.")
+
         self.save_hyperparameters()
     
     def make_target(self, inputs, preds) -> torch.Tensor:
+        assert self.targeted, "This attack is not targeted. You can only make targets for a targeted attack."
+
         if self.target == "negative":
             targeted_flow_tensor = -preds["flows"]
-        else:
+        elif self.target == "zero":
             targeted_flow_tensor = torch.zeros_like(preds["flows"])
+        else:
+            raise ValueError(f"Invalid target: {self.target}. Choose from 'negative' and 'zero'.")
         return targeted_flow_tensor
 
     def forward(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
@@ -37,7 +46,7 @@ class BaseAttack(LightningModule):
 
             - 'model': BaseModel, the model to be attacked
 
-            - 'targetted_inputs': Dict[str, torch.Tensor], optional, only used if the attack is targeted.
+            - 'targeted_inputs': Dict[str, torch.Tensor], optional, only used if the attack is targeted.
               A Dict similar to 'model_inputs' but with the 'flow' entry replaced with the target flow.
 
         Returns
@@ -45,24 +54,20 @@ class BaseAttack(LightningModule):
         Dict[str, torch.Tensor]
             For compatibility with the framework, the output should be a dict containing at least the following keys:
 
-            - 'flows': a 5D tensor BNCHW containing the predicted flows. The flows must be at the original scale, i.e.,
-              their size is the same as the input images, and the flow magnitudes are scaled accordingly. Most networks only
-              produce a single 2D optical flow per batch element, so the output shape will be B12HW. N can be larger than one
-              if the network produces predictions for a larger temporal window.
+            - 'perturbed_inputs': a dict matching the inputs format of ptlflow models.
+              In particular, it should have the key "images" containing the perturbed images.
 
-            - 'occs': optional, and only included if the network also predicts occlusion masks. It is a 5D tensor following the
-              same structure as 'flows'.
+            - 'preds': a dict matching the output format of ptlflow models
+              In particular, it should have the key "flows" containing the predicted flow of the input model on  perturbed images.
+              
+            - 'iteration_metrics' (optional): additional metrics to be logged
 
-            - 'mbs': same as 'occs' but for occlusion masks.
-
-            - 'confs': same as 'occs' but for flow confidence predictions.
-
-            The keys above are used by other parts of PTLFlow (if available). The output can also include any other keys as
-            well. For example, by default, the output of forward() will be passed to the loss function. So the output may
-            include keys which are going to be used for computing the training loss.
         """
         raise NotImplementedError()
 
     def preprocess_dataloader(self, dataset_name: str, data_module: FlowDataModuleFlowBench) -> DataLoader:
-        
+        """
+        Get the dataloader to be used for the attack if precomputed is True.
+        Sub-classes may overwrite this method for attack-specific logic.
+        """
         return data_module.val_dataloaders()[0]

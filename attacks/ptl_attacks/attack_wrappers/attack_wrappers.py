@@ -1,5 +1,8 @@
 
-from typing import Any, Dict, Literal, Tuple, Union
+import os
+from typing import Any, Dict, Literal, Optional, Tuple, Union
+
+from attacks.ptl_attacks.registry import register_attack
 from ..base_attack.base_attack import BaseAttack
 
 from ...fgsm import fgsm as fgsm_func
@@ -15,19 +18,22 @@ class FGSM(BaseAttack):
     def __init__(
         self, 
         attack_loss: Literal["epe"] = "epe",
-        attack_norm: Literal["two", "inf"] = "two",
+        attack_norm: Literal["two", "inf"] = "inf",
         attack_epsilon: float = 8 / 255,
+        attack_iterations: int = 3,
         targeted: bool = False,
-        
+        target: Optional[str] = None,
+
     ):
-        super().__init__(targeted=targeted)
+        super().__init__(targeted=targeted, target=target)
         self.attack_loss = attack_loss
         self.attack_norm = attack_norm
         self.attack_epsilon = attack_epsilon
+        self.attack_iterations = attack_iterations
 
     def forward(self, inputs: Dict[str, Any]):
         preds, perturbed_inputs = fgsm_func(
-            attack_args=dict(self.hparams),
+            attack_args=self.__dict__,
             inputs=inputs['inputs'],
             model=inputs['model'],
             targeted_inputs=inputs['targeted_inputs'],
@@ -37,6 +43,10 @@ class FGSM(BaseAttack):
             "perturbed_inputs": perturbed_inputs
         }
 
+@register_attack
+class fgsm(FGSM):
+    pass
+
 
 class BimPgdCospgd(BaseAttack):
 
@@ -44,23 +54,30 @@ class BimPgdCospgd(BaseAttack):
         self, 
         attack_loss: Literal["epe"] = "epe",
         targeted: bool = False,
-        attack_norm: Literal["two", "inf"] = "two",
+        target: Optional[str] = None,
+        attack_norm: Literal["two", "inf"] = "inf",
         attack_epsilon: float = 8 / 255,
         attack: Literal["bim", "pgd", "cospgd"] = "bim",
+        attack_iterations: int = 3,
+        attack_optim_target: Literal["ground_truth", "initial_flow"] = "ground_truth",
+        attack_alpha: float = 0.01,
     ):
-        super().__init__(targeted=targeted)
+        super().__init__(targeted=targeted, target=target)
         self.attack_loss = attack_loss
         self.attack_targeted = targeted
         self.attack_norm = attack_norm
         self.attack_epsilon = attack_epsilon
         self.attack = attack
+        self.attack_iterations = attack_iterations
+        self.attack_optim_target = attack_optim_target
+        self.attack_alpha = attack_alpha
 
     def forward(self, inputs: Dict[str, Any]):
         model = inputs['model']
         inputs_model = inputs['inputs']
         orig_preds = model(inputs_model)
         preds, perturbed_inputs, iteration_metrics = bim_pgd_cospgd_func(
-            attack_args=dict(self.hparams),
+            attack_args=self.__dict__,
             inputs=inputs_model,
             model=model,
             targeted_inputs=inputs['targeted_inputs'],
@@ -76,52 +93,46 @@ class BimPgdCospgd(BaseAttack):
 class BIM(BimPgdCospgd):
     def __init__(
         self, 
-        attack_loss: Literal["epe"] = "epe",
-        targeted: bool = False,
-        attack_norm: Literal["two", "inf"] = "two",
-        attack_epsilon: float = 8 / 255,
+        **kwargs,
     ):
         super().__init__(
-            attack_loss = attack_loss,
-            targeted = targeted,
-            attack_norm = attack_norm,
-            attack_epsilon = attack_epsilon,
+            **kwargs,
             attack = "bim",
         )
+
+@register_attack
+class bim(BIM):
+    pass
 
 
 class CosPGD(BimPgdCospgd):
     def __init__(
         self, 
-        attack_loss: Literal["epe"] = "epe",
-        targeted: bool = False,
-        attack_norm: Literal["two", "inf"] = "two",
-        attack_epsilon: float = 8 / 255,
+        **kwargs
     ):
         super().__init__(
-            attack_loss = attack_loss,
-            targeted = targeted,
-            attack_norm = attack_norm,
-            attack_epsilon = attack_epsilon,
+            **kwargs,
             attack = "cospgd",
         )
+
+@register_attack
+class cospgd(CosPGD):
+    pass
 
 
 class PGD(BimPgdCospgd):
     def __init__(
         self, 
-        attack_loss: Literal["epe"] = "epe",
-        targeted: bool = False,
-        attack_norm: Literal["two", "inf"] = "two",
-        attack_epsilon: float = 8 / 255,
+        **kwargs,
     ):
         super().__init__(
-            attack_loss = attack_loss,
-            targeted = targeted,
-            attack_norm = attack_norm,
-            attack_epsilon = attack_epsilon,
+            **kwargs,
             attack = "pgd",
         )
+
+@register_attack
+class pgd(PGD):
+    pass
 
 
 class APGD(BaseAttack):
@@ -130,7 +141,8 @@ class APGD(BaseAttack):
         self, 
         attack_loss: Literal["epe"] = "epe",
         targeted: bool = False,
-        attack_norm: Literal["two", "inf"] = "two",
+        target: Optional[str] = None,
+        attack_norm: Literal["two", "inf"] = "inf",
         attack_epsilon: float = 8 / 255,
         apgd_steps: int = 10,
         apgd_n_restarts: int = 1,
@@ -138,7 +150,7 @@ class APGD(BaseAttack):
         apgd_rho: float = 0.75,
         apgd_eot_iter: int = 1,
     ):
-        super().__init__(targeted=targeted)
+        super().__init__(targeted=targeted, target=target)
         self.attack_loss = attack_loss
         self.attack_targeted = targeted
         self.attack_norm = attack_norm
@@ -153,7 +165,7 @@ class APGD(BaseAttack):
         model = inputs['model']
         inputs_model = inputs['inputs']
         preds, perturbed_inputs = apgd_func(
-            attack_args=dict(self.hparams),
+            attack_args=self.__dict__,
             inputs=inputs_model,
             model=model,
             targeted_inputs=inputs['targeted_inputs']
@@ -162,6 +174,10 @@ class APGD(BaseAttack):
             "preds": preds,
             "perturbed_inputs": perturbed_inputs
         }
+
+@register_attack
+class apgd(APGD):
+    pass
 
 
 class FAB(BaseAttack):
@@ -170,16 +186,19 @@ class FAB(BaseAttack):
         self,
         attack_epsilon: float = 8 / 255,
         targeted: bool = False,
+        attack_iterations: int = 3,
+        target: Optional[str] = None,
     ):
-        super().__init__(targeted=targeted)
+        super().__init__(targeted=targeted, target=target)
         self.attack_targeted = targeted
         self.attack_epsilon = attack_epsilon
+        self.attack_iterations = attack_iterations
 
     def forward(self, inputs: Dict[str, Any]):
         model = inputs['model']
         inputs_model = inputs['inputs']
         preds, perturbed_inputs = fab_func(
-            attack_args=dict(self.hparams),
+            attack_args=self.__dict__,
             inputs=inputs_model,
             model=model,
             targeted_inputs=inputs['targeted_inputs']
@@ -189,6 +208,10 @@ class FAB(BaseAttack):
             "perturbed_inputs": perturbed_inputs
         }
 
+@register_attack
+class fab(FAB):
+    pass
+
 
 class Weather(BaseAttack):
     bool_or_rgb = Union[bool, Tuple[int]]
@@ -196,7 +219,7 @@ class Weather(BaseAttack):
         self,
         attack_epsilon: float = 8 / 255,
         attack_loss: Literal["mse", "epe"] = "epe",
-        weather_data: str = "/path/to/generated_weather_npz_data",
+        weather_data: str = "./datasets/adv_weather_data",
         weather_scene_scale: float = 1.0,
         weather_recolor: bool_or_rgb = False,
         weather_learn_offset: bool_or_rgb = True,
@@ -233,8 +256,40 @@ class Weather(BaseAttack):
         # weather_lr
         # weather_unregistered_artifacts
         # weather_num_flakes
+        targeted: bool = True,
+        target: Optional[str] = "zero"
     ):
-        super().__init__(targeted=True)
+        super().__init__(targeted=True, target=target)
+        if not targeted:
+            raise NotImplementedError("This weather attack implementation is a targeted attack.")
+
+        if not os.path.exists(weather_data):
+            raise ValueError(f"Folder {weather_data} does not exist. "
+                             "Please set the path to the weather data with --attack_obj.weather_data /path/to/generated_weather_npz_data. "
+                             "For more information, see <https://github.com/shashankskagnihotri/FlowBench#adversarial-weather>. ") 
+
+        self.attack_epsilon = attack_epsilon
+        self.attack_loss = attack_loss
+        self.weather_data = weather_data
+        self.weather_scene_scale = weather_scene_scale
+        self.weather_recolor = weather_recolor
+        self.weather_learn_offset = weather_learn_offset
+        self.weather_learn_motionoffset = weather_learn_motionoffset
+        self.weather_learn_transparency = weather_learn_transparency
+        self.weather_learn_color = weather_learn_color
+        self.weather_optimizer = weather_optimizer
+        self.weather_steps = weather_steps
+        self.weather_alph_motion = weather_alph_motion
+        self.weather_alph_motionoffset = weather_alph_motionoffset
+        self.weather_do_motionblur = weather_do_motionblur
+        self.weather_motionblur_samples = weather_motionblur_samples
+        self.weather_motionblur_scale = weather_motionblur_scale
+        self.weather_depth_check = weather_depth_check
+        self.weather_depth_check_differentiable = weather_depth_check_differentiable
+        self.weather_transparency_scale = weather_transparency_scale
+        self.weather_rendering_method = weather_rendering_method
+        self.weather_flakesize_max = weather_flakesize_max
+        self.weather_constant_transparency = weather_constant_transparency
         self.save_hyperparameters()
 
     def forward(self, inputs: Dict[str, Any]):
@@ -242,7 +297,7 @@ class Weather(BaseAttack):
         inputs_model = inputs['inputs']
         targeted_inputs =  inputs['targeted_inputs']
         preds, perturbed_inputs = weather_func(
-            attack_args=dict(self.hparams),
+            attack_args=self.__dict__,
             model=model,
             targeted_inputs=targeted_inputs,
             batch_index=None,
@@ -253,12 +308,16 @@ class Weather(BaseAttack):
             "perturbed_inputs": perturbed_inputs
         }
 
+@register_attack
+class weather(Weather):
+    pass
+
 
 class CommonCorruptions(BaseAttack):
     def __init__(
         self,
-        cc_name: float = 8 / 255,
-        cc_severity: int = 3,
+        cc_name: str,
+        cc_severity: int,
     ):
         super().__init__(targeted=False)
         self.cc_name = cc_name
@@ -268,7 +327,7 @@ class CommonCorruptions(BaseAttack):
         model = inputs['model']
         inputs_model = inputs['inputs']
         preds, perturbed_inputs = common_corrupt_func(
-            attack_args=dict(self.hparams),
+            attack_args=self.__dict__,
             inputs=inputs_model,
             model=model,
         )
@@ -276,6 +335,10 @@ class CommonCorruptions(BaseAttack):
             "preds": preds,
             "perturbed_inputs": perturbed_inputs
         }
+
+@register_attack
+class cc2d(CommonCorruptions):
+    pass
 
 
 class IdentityAttack(BaseAttack):
@@ -287,9 +350,13 @@ class IdentityAttack(BaseAttack):
     def forward(self, inputs: Dict[str, Any]):
         model = inputs['model']
         inputs_model = inputs['inputs']
-        preds = model[inputs_model]
+        preds = model(inputs_model)
         perturbed_inputs = inputs_model.copy()
         return {
             "preds": preds,
             "perturbed_inputs": perturbed_inputs
         }
+
+@register_attack
+class none(IdentityAttack):
+    pass

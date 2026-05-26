@@ -20,6 +20,7 @@ class FlowBenchCLI(PTLFlowCLI):
         print(self._attack_class)
         parser.add_argument(
             "--attack_obj",
+            default="none",
             type=self._attack_class,
             help="Attack to be used.",
         )

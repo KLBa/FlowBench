@@ -9,7 +9,7 @@ class PCFA(BaseAttack):
 
     def __init__(
         self, 
-        eps_box: float = 0.01, # also called attack_alpha
+        attack_alpha: float = 0.01, # also called eps_box
         attack_epsilon: float = 8 / 255,
         target: Literal["negative", "zero"] = "zero",
         pcfa_boxconstraint: Literal["clipping", "change_of_variables"] = "change_of_variables",
@@ -17,13 +17,13 @@ class PCFA(BaseAttack):
         attack_loss: str = "epe",
     ):
         super().__init__(targeted=True, target=target)
-        self.eps_box = eps_box
+        self.attack_alpha = attack_alpha
         self.attack_epsilon = attack_epsilon
         self.pcfa_boxconstraint = pcfa_boxconstraint
         self.attack_iterations = attack_iterations
         self.attack_loss = attack_loss
 
-    def attack(self, inputs: Dict[str, Any]):
+    def forward(self, inputs: Dict[str, Any]):
         preds, perturbed_inputs, iteration_metrics = pcfa_func(
             attack_args=self.__dict__,
             inputs=inputs['inputs'],

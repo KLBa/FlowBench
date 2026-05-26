@@ -38,6 +38,8 @@ from tqdm import tqdm
 from loguru import logger
 import yaml
 
+from attacks.ptl_attacks.registry import RegisteredAttack
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # adds project root
 
 from attacks.ptl_attacks.cli.flowbench_cli import FlowBenchCLI
@@ -124,7 +126,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--output_path",
         type=str,
-        default=str(Path("outputs/flowbench")),
+        default=str(Path("outputs/flowbench_objectapi")),
         help="Path to the directory where the validation results will be saved.",
     )
     parser.add_argument(
@@ -239,17 +241,12 @@ def attack_single(
     output_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
     output_data.append(("model", args.model.as_dict()))
     output_data.append(("checkpoint", args.ckpt_path))
+    output_data.append(("attack", args.attack_obj.as_dict()))
     iteration_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
     iteration_data.append(("model", args.model.as_dict()))
     iteration_data.append(("checkpoint", args.ckpt_path))
+    iteration_data.append(("attack", args.attack_obj.as_dict()))
 
-    for key, value in attack.hparams_initial.items():
-        if "_" in key:
-            key = key.split("_")[1]
-        if isinstance(value, float):
-            value = round(value, 4)
-        output_data.append((key, value))
-        iteration_data.append((key, value))
     logger.info(f"Attack arguments: {args.attack_obj}")
     for dataset_name, dl in dataloaders.items():
         metrics_mean, iteration_metrics_mean = attack_one_dataloader(
@@ -286,7 +283,6 @@ def attack_single(
             metrics = {"experiments": []}
         metrics["experiments"].append(output_dict)
         with open(output_filename, "w") as json_file:
-            print("metrics", metrics)
             json.dump(metrics, json_file, indent=4)
         if iteration_metrics_mean:
             iteration_output_dict = {}
@@ -433,6 +429,20 @@ def attack_one_dataloader(
             iteration_metrics = {}
             # pdb.set_trace()
             if isinstance(attack_args, BaseAttack):
+                
+                # debugging only
+                if os.path.exists("'outputs/debugging/inputs.pth'"):
+                    inputs_old = torch.load('outputs/debugging/inputs.pth', weights_only=False)
+                    model_old = torch.load('outputs/debugging/model.pth', weights_only=False)
+                    target_old = torch.load('outputs/debugging/targeted_inputs.pth', weights_only=False)
+                    
+                    logger.warning('Check against v0.1.1')
+                    if not attack_args.precomputed:
+                        assert torch.all(inputs_old["images"] == inputs["images"])
+                    # assert model_old == model
+                    if targeted_inputs:
+                        assert torch.all(target_old["flows"] == targeted_inputs["flows"])
+                
                 attack_obj = attack_args
                 outputs = attack_obj({'inputs': inputs, 'model': model, 'targeted_inputs': targeted_inputs})
 
@@ -447,6 +457,30 @@ def attack_one_dataloader(
             else:
                 raise ValueError("expecting attack as object")
 
+            # debugging only
+            if os.path.exists("outputs/debugging/preds.pth"):
+                preds_old = torch.load('outputs/debugging/preds.pth', weights_only=False)
+                perturbed_inputs_old = torch.load('outputs/debugging/perturbed_inputs.pth', weights_only=False)
+                iteration_metrics_old = torch.load('outputs/debugging/iteration_metrics.pth', weights_only=False)
+
+                logger.warning('Check preds against v0.1.1')
+                assert torch.allclose(perturbed_inputs_old["images"], perturbed_inputs["images"]), torch.abs(perturbed_inputs_old["images"] - perturbed_inputs["images"]).max()
+                assert torch.all(perturbed_inputs_old["images"] == perturbed_inputs["images"])
+                assert torch.all(perturbed_inputs_old["flows"] == perturbed_inputs["flows"])
+
+                assert torch.all(preds_old["flows"] == preds["flows"])
+
+                assert "val/l2_delta1_i1" in iteration_metrics_old, iteration_metrics_old
+                logger.debug(f"iteration_metrics_old.keys() == {iteration_metrics_old.keys()}")
+                assert torch.all(iteration_metrics_old["val/l2_delta1_i1"] == iteration_metrics_old["val/l2_delta1_i1"]), iteration_metrics_old
+                assert torch.all(iteration_metrics_old["val/l0_delta2_i1"] == iteration_metrics_old["val/l0_delta2_i1"])
+                assert torch.all(iteration_metrics_old["val/l2_delta1_i1"] == iteration_metrics_old["val/l2_delta1_i1"]), iteration_metrics_old
+                assert torch.all(iteration_metrics_old["val/l0_delta2_i1"] == iteration_metrics_old["val/l0_delta2_i1"])
+
+                # assert model_old == model
+                if targeted_inputs:
+                    assert torch.all(target_old["flows"] == targeted_inputs["flows"])
+                
             for key in preds:
                 if torch.is_tensor(preds[key]):
                     preds[key] = preds[key].detach()
@@ -675,6 +709,13 @@ def attack_one_dataloader(
 
     metrics_mean = {}
     n = i + 1
+
+    assert n == len(dataloader) or n == args.max_samples, (
+        f"Normalizing by num_samples = {n}. Number of samples is {len(dataloader)}. "
+        f"If you set --max_samples {n}, you can ignore this warning. "
+        "Otherwise, the normalization is broken."
+    )
+
     for k, v in metrics_sum.items():
         metrics_mean[k] = v / n
     metrics_mean['num_samples'] = n
@@ -856,7 +897,7 @@ if __name__ == "__main__":
     parser = _init_parser()
     
     cli = FlowBenchCLI(
-        attack_class=BaseAttack,
+        attack_class=RegisteredAttack,
         model_class=RegisteredModel,
         subclass_mode_model=True,
         datamodule_class=FlowDataModuleFlowBench,

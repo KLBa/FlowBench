@@ -7,7 +7,7 @@ from .base_attack.base_attack import BaseAttack
 
 _attacks_dict = {}
 
-class RegisteredAttack(object):
+class RegisteredAttack(pl.LightningModule):
     pass
 
 def register_attack(attack_class: Type[BaseAttack]) -> Type[BaseAttack]:
