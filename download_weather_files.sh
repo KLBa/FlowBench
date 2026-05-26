@@ -47,10 +47,12 @@ parallel_unzip() {
 }
 
 # File IDs and their persistent IDs
+# (Each unzipped file is ~130 GB. Select only the ones you want to use.)
 declare -A FILE_IDS=(
     ["particles_3000_npz.zip"]="doi:10.18419/DARUS-3677/28"
-    ["rain_1500_npz.zip"]="doi:10.18419/DARUS-3677/22"
-    ["size_fog_npz.zip"]="doi:10.18419/DARUS-3677/24"
+    # ["rain_1500_npz.zip"]="doi:10.18419/DARUS-3677/27"
+    # ["color_red_npz.zip"]="doi:10.18419/DARUS-3677/24"
+    # ["size_fog_npz.zip"]="doi:10.18419/DARUS-3677/29"
 )
 
 # Create a temporary download directory that will be cleaned up
