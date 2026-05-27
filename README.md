@@ -12,15 +12,9 @@ Accepted at Transactions on Machine Learning Research (TMLR), 2025
 
 ## Installation
 
-This package requires **Python 3.10.x** (tested with 3.10.17). Please ensure you have a compatible Python version installed.
+This package requires **Python 3.1x.x** (tested with 3.13.5). Please ensure you have a compatible Python version installed.
 
-> ⚠️ **CUDA Toolkit Version Note:**
-> This package assumes your system uses **CUDA 11.8** (installed system-wide).
-> If your system CUDA version differs from the one used to build the PyTorch installation, you may encounter runtime issues.
-> In such cases, follow the official PyTorch installation instructions to install a compatible version:
-> https://pytorch.org/get-started/locally/
-
-### Step 0: Clone the repository including submodules
+### Step 1: Clone the repository including submodules
 
 ```bash
 git clone --recurse-submodules <url>
@@ -28,14 +22,17 @@ git clone --recurse-submodules <url>
 git submodule update --init --recursive
 ```
 
+<details><summary>Install dependencies as you encounter them while running the code.</summary>
+
 ### ~~Step 1: Run the installation script~~
 
-Just try to run stuff and install missing packages as you encounter them.
-Refer to `install.sh` for how the FlowBench's authors installed packages but you may need different versions, e.g., PyTorch version depends on your CUDA version, `spatial-correlation-sampler` is notoriously not working for me and `alt_cuda_corr` is also growing increasingly old...
+Refer to `install.sh` for how the FlowBench's authors installed packages but you may need different versions, e.g., the PyTorch version depends on your CUDA version, `spatial-correlation-sampler` is notoriously not working for me and `alt_cuda_corr` is also growing increasingly old...
 
 ```bash
 bash install.sh
 ```
+
+</details>
 
 ### Step 2: Install this package in development mode
 
@@ -102,7 +99,9 @@ bash download_weather_files.sh
 
 ## How to Use
 
-### Model Zoo
+### Python API
+
+#### Model Zoo
 
 ```python
 from flowbench.evals import load_model
@@ -119,9 +118,9 @@ To browse the full list of supported models:
 
 - See [`SUPPORTED_MODELS.md`](./SUPPORTED_MODELS.md)
 
-### Evaluation
+#### Evaluation
 
-#### Adversarial Attacks
+##### Adversarial Attacks
 
 ```python
 from flowbench.evals import evaluate
@@ -147,7 +146,7 @@ model, results = evaluate(
 - `target`: Target flow for a targeted attack (only applicable if `targeted=True`). Supported values: `'zero'` or `'negative'`
 - `optim_wrt`: Flow used as a reference for optimization. Supported values: `'ground_truth'` or `'initial_flow'`
 
-#### Adversarial Weather
+##### Adversarial Weather
 
 ```python
 # demo.py
@@ -187,7 +186,7 @@ python demo.py --weather_data datasets/adv_weather_data/weather_snow_3000
 - `targeted`: Boolean flag indicating whether the attack is targeted
 - `target`: Target flow for a targeted attack (only applicable if `targeted=True`). Supported values: `'zero'` or `'negative'`
 
-#### 2D Common Corruptions
+##### 2D Common Corruptions
 
 ```python
 from flowbench.evals import evaluate
@@ -205,7 +204,7 @@ model, results = evaluate(
 - `threat_model`: Must be `'2DCommonCorruption'`; returns evaluations across 15 corruption types
 - `severity`: An integer from 1 to 5 indicating the corruption severity
 
-#### 3D Common Corruptions
+##### 3D Common Corruptions
 
 ```python
 from flowbench.evals import evaluate
@@ -223,10 +222,95 @@ model, results = evaluate(
 - `threat_model`: Must be `'3DCommonCorruption'`; returns evaluations across 8 corruption types
 - `severity`: An integer from 1 to 5 indicating the corruption severity
 
-# CITATION
+### Command Line Interface
+
+FlowBench offers a command line interface inspired by ptlflow's scripts.
+
+Example:
+
+```sh
+python -m flowbench.attacks_refactored \
+    --model raft --ckpt_path chairs --model.iters 1 \
+    --data.val_dataset kitti-2015-trainval --data.dataset_config_path datasets.yaml \
+    --attack_obj pcfa --attack_obj.attack_iterations 1 --attack_obj.attack_epsilon 1
+```
+
+FlowBench's CLI extends ptlflow's CLI.
+The most important arguments include:
+
+#### ptlflow-inherited arguments
+
+All arguments defining the model and data are inherited from ptlflow.
+
+- `--model` the name of the model or a dot path to its definition, use `--model.property_name` to change a hyperparameter of the model
+- `--ckpt_path` a file path to the checkpoint or a shorthand (typically `chairs`, `things`, `sintel`) defined by ptlflow
+- `--data.val_dataset` the dataset the attack will be performed on
+  - (Note that `--data.train_dataset` and `--data.test_dataset` are ignored!)
+- `--data.dataset_config_path` a path a yaml file defining the dataset paths
+
+#### FlowBench-specific args
+
+FlowBench adds arguments defining the attack and logging.
+
+Attack args:
+
+- `--attack_obj` an attack name or a dot path to its definition
+  - To pass attack-specific arguments, e.g., number of iterations and the perturbation limit $\varepsilon$, use the dot notation from jsonargparse, e.g.
+  
+  ```sh
+  --attack_obj.attack_iterations 3 --attack_obj.attack_epsilon 0.001
+  ```
+
+Logging args:
+
+- `--output_path /path/to/outputs` path to write outputs to. `flowbench.attacks_refactored` always writes a JSON containing the experiment results.
+- `--write_outputs` set this flag to store the perturbed images to the output path (Note that this may explode your storage.)
+
+### Metric Names
+
+FlowBench logs experiments under `args.output_path`, on this fork the default is outputs/flowbench (main defaults to outputs/validate iirc)
+
+| Previous name                     | New name  | Meaning   |
+|---                                |---        |---        |
+| epe                               |           | _If targeted:_ AEPE between attack target and attacked flow. _If not targeted:_ epe between ground truth and attacked flow. |
+| px1                               |           | _If targeted:_ px1 between attack target and attacked flow. _If not targeted:_ px1 between ground truth and attacked flow. |
+| px3                               |           | _If targeted:_ px3 between attack target and attacked flow. _If not targeted:_ px3 between ground truth and attacked flow. |
+| px5                               |           | _If targeted:_ px5 between attack target and attacked flow. _If not targeted:_ px5 between ground truth and attacked flow. |
+| flall                             |           | _If targeted:_ flall between attack target and attacked flow. _If not targeted:_ flall between ground truth and attacked flow. |
+| wauc                              |           | _If targeted:_ wauc between attack target and attacked flow. _If not targeted:_ wauc between ground truth and attacked flow. |
+| own_epe                           |           | _If targeted:_ AEPE between attack target and attacked flow. _If not targeted:_ AEPE between ground truth and attacked flow. |
+| epe_orig_preds                    |           | AEPE between unattacked flow and attacked flow |
+| own_epe_orig_preds                |           | (same as epe_orig_preds but differently calculated) |
+| cosim_target                      |           | Cosine similarity between attack target and attacked flow |
+| cosim_orig_preds                  |           | Cosine similarity between unattacked flow and attacked flow |
+| epe_ground_truth                  |           | AEPE between ground truth and attacked flow |
+| own_epe_ground_truth              |           | (same as epe_ground_truth but differently calculated) |
+| cosim_ground_truth                |           | Cosine similarity between ground truth and attacked flow          |
+| l2_delta1                         |           | l2 norm of perturbation on frame 1           |
+| l2_delta2                         |           | l2 norm of perturbation on frame 2           |
+| l2_delta12                        |           | l2 norm of combined perturbation on both frames           |
+| l0_delta1                         |           | l0 norm of perturbation on frame 1           |
+| l0_delta2                         |           | l0 norm of perturbation on frame 2           |
+| l0_delta12                        |           | l0 norm of combined perturbation on both frames           |
+| l_inf_delta1                      |           | l_inf norm of perturbation on frame 1           |
+| l_inf_delta2                      |           | l_inf norm of perturbation on frame 2           |
+| l_inf_delta12                     |           | l_inf norm of combined perturbation on both frames           |
+| epe_initial_to_negative           |           | AEPE between attacked flow and negative unattacked flow |
+| epe_initial_to_zero               |           | AEPE between attacked flow and zero flow (that is average flow magnitude) |
+| epe_ground_truth_to_negative      |           | AEPE between ground truth and negative unattacked flow          |
+| epe_ground_truth_to_zero          |           | AEPE between ground truth and zero flow (that is average flow magnitude) |
+| own_epe_ground_truth_to_negative  |           | (same as epe_ground_truth_to_negative but differently calculated) |
+| own_epe_ground_truth_to_zero      |           | (same as own_epe_ground_truth_to_zero but differently calculated) |
+
+Abbreviations:
+
+AEPE = Average endpoint error
+
+## CITATION
+
 If you use this work, please cite:
 
-```
+```bibtex
 @article{
 agnihotri2025flowbench,
 title={FlowBench: Benchmarking Optical Flow Estimation Methods for Reliability and Generalization},
@@ -238,7 +322,9 @@ url={https://openreview.net/forum?id=Kh4bj6YDNm},
 note={}
 }
 ```
+
 or
-```
+
+```txt
 Agnihotri, Shashank, Julian Yuya Caspary, Luca Schwarz, Xinyan Gao, Jenny Schmalfuss, Andrés Bruhn, and Margret Keuper. “FlowBench: Benchmarking Optical Flow Estimation Methods for Reliability and Generalization.” Transactions on Machine Learning Research, 2025. https://openreview.net/forum?id=Kh4bj6YDNm
 ```
