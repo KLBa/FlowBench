@@ -791,7 +791,7 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBen
                 except Exception as e:
                     logger.error(f"Exception {e}")
                     print('Tried to serialize:', metrics)
-                    print(type(metrics['experiemnts'][0]['model']))
+                    print(type(metrics['experiments'][0]['model']))
                     raise e
 
                 with open(output_filename, "w") as json_file:
