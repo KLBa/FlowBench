@@ -21,8 +21,6 @@ class BaseAttack(LightningModule):
         self.attack_target = target # for compability with old parameter naming
         if self.targeted and self.target is None:
             raise ValueError("You must pass a target for the targeted attack. Choose from 'negative' and 'zero'.")
-
-        self.save_hyperparameters()
     
     def make_target(self, inputs, preds) -> torch.Tensor:
         assert self.targeted, "This attack is not targeted. You can only make targets for a targeted attack."
