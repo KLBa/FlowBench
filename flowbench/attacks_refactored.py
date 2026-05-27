@@ -115,6 +115,7 @@ def bool_or_rgb(value):
 
 
 def _init_parser() -> ArgumentParser:
+    """Create a parser which parses the checkpoint path and logging parameters."""
     parser = ArgumentParser(add_help=False)
     parser.add_argument(
         "--ckpt_path",
@@ -212,7 +213,7 @@ def _init_parser() -> ArgumentParser:
     parser.add_argument(
         "--compare_to_targets",
         action="store_true",
-        help="If set, compare the attacked flow to the zero flow and negative predicted flow.",
+        help="If set, compare the attacked flow to the zero flow and negative of the unattacked flow.",
     )
 
     return parser
@@ -308,8 +309,8 @@ def attack_single(
                 json.dumps(metrics, indent=4)
             except Exception as e:
                 logger.error(f"Exception {e}")
-                print('Tried to serialize:', metrics)
-                print(type(metrics['experiemnts'][0]['model']))
+                logger.info('Tried to serialize:', metrics)
+                logger.info(type(metrics['experiments'][0]['model']))
                 raise e
             with open(output_filename, "w") as json_file:
                 json.dump(metrics, json_file, indent=4)
@@ -402,7 +403,7 @@ def attack_one_dataloader(
             inputs["prev_preds"] = prev_preds
 
             if inputs["images"].max() > 1.0:
-                raise ValueError("ptlflow normalizes RGB range to be <= 1.0")
+                raise ValueError(f"Expecting RGB range to be <= 1.0. Actual: [{inputs['images'].min(), inputs['images'].max()}]")
                 attack_args["attack_epsilon"] = attack_args["attack_epsilon"] * 255
                 attack_args["attack_alpha"] = attack_args["attack_alpha"] * 255
             has_ground_truth = True
@@ -427,7 +428,8 @@ def attack_one_dataloader(
             #     targeted_inputs = inputs.copy()
 
             iteration_metrics = {}
-            # pdb.set_trace()
+            
+            # debugging only
             if isinstance(attack_args, BaseAttack):
                 
                 # debugging only
@@ -458,7 +460,7 @@ def attack_one_dataloader(
                 raise ValueError("expecting attack as object")
 
             # debugging only
-            if os.path.exists("outputs/debugging/preds.pth"):
+            if os.path.exists("outputs/debugging/preds.pth") and False:
                 preds_old = torch.load('outputs/debugging/preds.pth', weights_only=False)
                 perturbed_inputs_old = torch.load('outputs/debugging/perturbed_inputs.pth', weights_only=False)
                 iteration_metrics_old = torch.load('outputs/debugging/iteration_metrics.pth', weights_only=False)
@@ -480,7 +482,8 @@ def attack_one_dataloader(
                 # assert model_old == model
                 if targeted_inputs:
                     assert torch.all(target_old["flows"] == targeted_inputs["flows"])
-                
+            
+            # detach everything
             for key in preds:
                 if torch.is_tensor(preds[key]):
                     preds[key] = preds[key].detach()
@@ -689,7 +692,8 @@ def attack_one_dataloader(
                              i,
                              inputs.get("meta"),
                              perturbed_inputs,
-                             dict(attack_args.hparams_initial),
+                             attack_args={"attack_name": attack_args.__class__.__name__,
+                                          **attack_args.hparams},
                              )
             if args.max_samples is not None and i >= (args.max_samples - 1):
                 break
@@ -711,9 +715,8 @@ def attack_one_dataloader(
     n = i + 1
 
     assert n == len(dataloader) or n == args.max_samples, (
-        f"Normalizing by num_samples = {n}. Number of samples is {len(dataloader)}. "
-        f"If you set --max_samples {n}, you can ignore this warning. "
-        "Otherwise, the normalization is broken."
+        f"Normalizing by num_samples = {n}. Number of samples is --max_samples={args.max_samples} or dataset_size={len(dataloader)}. "
+        "The normalization is likely broken."
     )
 
     for k, v in metrics_sum.items():
@@ -784,7 +787,7 @@ def _write_to_npy_file(
     dataloader_name: str,
     batch_idx: int,
     metadata: Optional[Dict[str, Any]] = None,
-    perturbed_inputs: Dict[str, torch.Tensor] = None,
+    perturbed_inputs: Optional[Dict[str, torch.Tensor]] = None,
     attack_args: Optional[Dict[str, List[object]]] = None,
 ) -> None:
     out_root_dir = Path(args.output_path) / dataloader_name
@@ -838,8 +841,14 @@ def _write_to_npy_file(
             if k == "images":
                 out_dir_imgs = out_dir / k / extra_dirs
                 out_dir_imgs.mkdir(parents=True, exist_ok=True)
-                if v.max() <= 1:
+                if v.max() <= 2:
+                    if v.max() >= 1:
+                        logger.info(f"This attack does not adhere to image range [0, 1]. "
+                                    f"Actual range is [{v.min()}, {v.max()}]")
                     v = v * 255
+                else:
+                    raise ValueError(f"Expected image in range [0, 1]. "
+                                     f"Passing image with range [{v.min()}, {v.max()}] is suspicious.")
 
                 image = v[0, 0].detach().cpu()
                 image2 = v[0, 1].detach().cpu()
