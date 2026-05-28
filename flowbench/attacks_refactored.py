@@ -17,9 +17,7 @@
 # =============================================================================
 
 from argparse import ArgumentTypeError
-import pdb
 import ast
-import logging
 import sys
 from jsonargparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -34,6 +32,8 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+from torch.nn.functional import cosine_similarity
+
 from tqdm import tqdm
 from loguru import logger
 import yaml
@@ -46,26 +46,10 @@ from attacks.ptl_attacks.cli.flowbench_cli import FlowBenchCLI
 from attacks.ptl_attacks.base_attack.base_attack import BaseAttack
 from attacks.data.flow_datamodule_extended import FlowDataModuleFlowBench
 
-from attacks.fgsm import fgsm
-from attacks.apgd import apgd
-from attacks.bim_pgd_cospgd import bim_pgd_cospgd
-from attacks.fab import fab
-from attacks.pcfa import pcfa
-from attacks.tdcc import get_dataset_3DCC
-from attacks.common_corruptions import common_corrupt
-from attacks.weather import weather
-from attacks.attack_utils.attack_args_parser import AttackArgumentParser
-from attacks.attack_utils.attack_args_parser import (
-    attack_targeted_string,
-    attack_arg_string,
-)
 import attacks.attack_utils.loss_criterion as losses
 from attacks.attack_utils.loss_criterion import LossCriterion
-
-# Import cosPGD functions
-import torch.nn as nn
-from torch.nn.functional import cosine_similarity
 from attacks.attack_utils.utils import get_flow_tensors, get_image_tensors
+
 
 from ptlflow import get_model, get_model_reference, restore_model
 from ptlflow.utils.registry import RegisteredModel
@@ -82,16 +66,14 @@ from ptlflow.utils.utils import (
 )
 
 # Default Attack parameters
-epsilon = 8 / 255
-norm = "inf"
-alpha = 0.01
-iterations = 3
-loss_function = "epe"
-targeted = False
-batch_size = 1
-
-delta_bound = 0.005
-
+# epsilon = 8 / 255
+# norm = "inf"
+# alpha = 0.01
+# iterations = 3
+# loss_function = "epe"
+# targeted = False
+# batch_size = 1
+# delta_bound = 0.005
 
 config_logging()
 
@@ -273,7 +255,7 @@ def attack_single(
         output_dict = {}
         for key, value in output_data:
             if "val" in key:
-                output_dict.setdefault("metrics", {})[key.split("/")[1]] = value
+                output_dict.setdefault("metrics", {})[key.replace("val/", "")] = value
             else:
                 output_dict[key] = value
         output_filename = args.output_path / f"metrics_{args.data.val_dataset}.json"
@@ -290,7 +272,7 @@ def attack_single(
             for key, value in iteration_data:
                 if "val" in key:
                     iteration_output_dict.setdefault("metrics", {})[
-                        key.split("/")[1]
+                        key.replace("val/", "")
                     ] = value
                 else:
                     iteration_output_dict[key] = value
@@ -429,7 +411,6 @@ def attack_one_dataloader(
 
             iteration_metrics = {}
             
-            # debugging only
             if isinstance(attack_args, BaseAttack):
                 
                 # debugging only
@@ -460,7 +441,7 @@ def attack_one_dataloader(
                 raise ValueError("expecting attack as object")
 
             # debugging only
-            if os.path.exists("outputs/debugging/preds.pth") and False:
+            if os.path.exists("outputs/debugging/preds.pth"):
                 preds_old = torch.load('outputs/debugging/preds.pth', weights_only=False)
                 perturbed_inputs_old = torch.load('outputs/debugging/perturbed_inputs.pth', weights_only=False)
                 iteration_metrics_old = torch.load('outputs/debugging/iteration_metrics.pth', weights_only=False)
@@ -479,10 +460,6 @@ def attack_one_dataloader(
                 assert torch.all(iteration_metrics_old["val/l2_delta1_i1"] == iteration_metrics_old["val/l2_delta1_i1"]), iteration_metrics_old
                 assert torch.all(iteration_metrics_old["val/l0_delta2_i1"] == iteration_metrics_old["val/l0_delta2_i1"])
 
-                # assert model_old == model
-                if targeted_inputs:
-                    assert torch.all(target_old["flows"] == targeted_inputs["flows"])
-            
             # detach everything
             for key in preds:
                 if torch.is_tensor(preds[key]):
@@ -535,6 +512,82 @@ def attack_one_dataloader(
                     elif isinstance(val, torch.Tensor) and len(val.shape) == 5:
                         inputs[key] = val[:, k : k + 1]
 
+            ####################
+            # Evaluate metrics #
+            ####################
+
+            flows_to_compare = {
+                "original": orig_preds,
+                "attacked": preds,
+            }
+
+            key_pairs = [
+                ("original", "attacked"),
+            ]
+            # itertools.combinations(flows_to_compare.keys(), 2)
+
+            if attack_args.targeted:
+                flows_to_compare["target"] = targeted_inputs
+                key_pairs.extend([
+                    ("original", "target"),
+                    ("attacked", "target"),
+                ])
+
+            if has_ground_truth:
+                flows_to_compare["groundtruth"] = inputs
+
+                key_pairs.extend([
+                    ("original", "groundtruth"),
+                    ("attacked", "groundtruth"),
+                ])
+
+            if args["compare_to_targets"]:
+                targeted_flow_tensor_negative = -orig_preds["flows"].clone()
+                targeted_flow_tensor_zero = torch.zeros_like(orig_preds["flows"])
+
+                # include other keys from inputs in case other data is relevant, e.g., "valid" key is used by FlowMetrics
+                flows_to_compare["zero"] = {**inputs, "flows": targeted_flow_tensor_zero}
+                flows_to_compare["negative"] = {**inputs, "flows": targeted_flow_tensor_negative}
+
+                key_pairs.extend([
+                    ("original", "zero"),
+                    ("original", "negative"),
+                    ("attacked", "zero"),
+                    ("attacked", "negative"),
+                ])
+                # don't compare to ground truth or target
+
+            metrics_all_against_all = {}
+            
+            # compute metrics between every pair of flow fields
+            for (key_1, key_2) in key_pairs:
+                # exclude specific pairs
+                if (key_1, key_2) == ("zero", "negative"):
+                    # difference from zero to negative is always same as orginal to negative
+                    continue
+                d1 = flows_to_compare[key_1]
+                d2 = flows_to_compare[key_2]
+                m12 = model.val_metrics[0](d1, d2)
+                
+                metrics_all_against_all.update(
+                    {f"{metricname}_{key_1}_to_{key_2}": value for metricname, value in m12.items()}
+                )
+                
+                criterion = LossCriterion("epe")
+                loss_12 = criterion.loss(
+                        d1["flows"].squeeze(0).float(),
+                        d2["flows"].squeeze(0).float(),
+                )
+                loss_12 = loss_12.mean()
+                # if loss_12 != m12["val/epe"]:
+                #     logger.warning(f"FlowBench and ptlflow disagree on EPE between {key_1} and {key_2}. Are there invalid pixels?")
+                metrics_all_against_all[f"val/own_epe_{key_1}_to_{key_2}"] = loss_12
+                metrics_all_against_all[f"val/own_cosim_{key_1}_to_{key_2}"] = torch.mean(
+                    cosine_similarity(
+                        get_flow_tensors(d1), get_flow_tensors(d2)
+                    )
+                )
+
             if attack_args.targeted:
 
                 metrics = model.val_metrics[0](preds, targeted_inputs)
@@ -584,7 +637,7 @@ def attack_one_dataloader(
                         )
                     )
             else:
-                metrics = model.val_metrics[0](preds, inputs)
+                metrics: Dict[str, torch.Tensor] = model.val_metrics[0](preds, inputs)
 
                 criterion = LossCriterion("epe")
                 loss = criterion.loss(
@@ -645,6 +698,11 @@ def attack_one_dataloader(
                     metrics["val/epe_ground_truth_to_zero"] = metrics_ground_truth_zero[
                         "val/epe"
                     ]
+
+            metrics.update({
+                f"new/{k}": v for k, v in metrics_all_against_all.items()
+            })
+
             if True:
                 # compute perturbation size
                 adv_image1, adv_image2 = get_image_tensors(perturbed_inputs)
@@ -842,7 +900,7 @@ def _write_to_npy_file(
                 out_dir_imgs = out_dir / k / extra_dirs
                 out_dir_imgs.mkdir(parents=True, exist_ok=True)
                 if v.max() <= 2:
-                    if v.max() >= 1:
+                    if v.max() > 1:
                         logger.info(f"This attack does not adhere to image range [0, 1]. "
                                     f"Actual range is [{v.min()}, {v.max()}]")
                     v = v * 255
