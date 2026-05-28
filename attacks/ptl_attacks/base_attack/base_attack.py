@@ -1,12 +1,11 @@
 
 from typing import Any, Dict, Optional
-from lightning import LightningModule
 import torch
 from torch.utils.data import DataLoader
 
 from attacks.data.flow_datamodule_extended import FlowDataModuleFlowBench
 
-class BaseAttack(LightningModule):
+class BaseAttack(object):
 
     def __init__(self,
                  precomputed: bool = False,
@@ -32,6 +31,10 @@ class BaseAttack(LightningModule):
         else:
             raise ValueError(f"Invalid target: {self.target}. Choose from 'negative' and 'zero'.")
         return targeted_flow_tensor
+
+    def __call__(self, *args, **kwargs):
+        """Calls self.forward(*args, **kwargs)"""
+        return self.forward(*args, **kwargs)
 
     def forward(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         """
