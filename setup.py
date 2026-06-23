@@ -13,7 +13,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "cospgd>=0.1.3",
-        "cupy-cuda11x>=13.4.1",
+        # "cupy-cuda11x>=13.4.1",
         # allow install without specifying torch version - the user has to install PyTorch manually
         # "torch==2.7.0+cu118",
         # "torch-scatter==2.1.2",
