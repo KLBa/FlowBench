@@ -101,6 +101,9 @@ bash download_weather_files.sh
 
 ### Python API
 
+> :warning: I'm not using the Python API and `flowbench.evals`, so they're likely to be broken on this fork.
+> Skip to the [Commandline Interface](#command-line-interface).
+
 #### Model Zoo
 
 ```python
@@ -270,15 +273,25 @@ Logging args:
 
 FlowBench logs experiments under `args.output_path`, on this fork the default is outputs/flowbench (main defaults to outputs/validate iirc)
 
+> :warning: Metrics with `own_` pre-prepended ignore the `valid` map.
+> This is fine when comparing to anything except ground truth...  
+
 | Previous name                     | New name  | Meaning   |
 |---                                |---        |---        |
-| epe                               |           | _If targeted:_ AEPE between attack target and attacked flow. _If not targeted:_ epe between ground truth and attacked flow. |
-| px1                               |           | _If targeted:_ px1 between attack target and attacked flow. _If not targeted:_ px1 between ground truth and attacked flow. |
-| px3                               |           | _If targeted:_ px3 between attack target and attacked flow. _If not targeted:_ px3 between ground truth and attacked flow. |
-| px5                               |           | _If targeted:_ px5 between attack target and attacked flow. _If not targeted:_ px5 between ground truth and attacked flow. |
-| flall                             |           | _If targeted:_ flall between attack target and attacked flow. _If not targeted:_ flall between ground truth and attacked flow. |
-| wauc                              |           | _If targeted:_ wauc between attack target and attacked flow. _If not targeted:_ wauc between ground truth and attacked flow. |
-| own_epe                           |           | _If targeted:_ AEPE between attack target and attacked flow. _If not targeted:_ AEPE between ground truth and attacked flow. |
+| epe                               | epe_attacked_to_target          | _If targeted:_ AEPE between attack target and attacked flow. |
+| epe                               | epe_attacked_to_groundtruth          | _If not targeted:_ epe between ground truth and attacked flow. |
+| px1                               | px1_attacked_to_target          | _If targeted:_ px1 between attack target and attacked flow. |
+| px1                               | px1_attacked_to_groundtruth          | _If not targeted:_ px1 between ground truth and attacked flow. |
+| px3                               | px3_attacked_to_target          | _If targeted:_ px3 between attack target and attacked flow. |
+| px3                               | px3_attacked_to_groundtruth          | _If not targeted:_ px3 between ground truth and attacked flow. |
+| px5                               | px5_attacked_to_target          | _If targeted:_ px5 between attack target and attacked flow. |
+| px5                               | px5_attacked_to_groundtruth          | _If not targeted:_ px5 between ground truth and attacked flow. |
+| flall                             | flall_attacked_to_target          | _If targeted:_ flall between attack target and attacked flow. |
+| flall                             | flall_attacked_to_groundtruth          | _If not targeted:_ flall between ground truth and attacked flow. |
+| wauc                              | wauc_attacked_to_target          | _If targeted:_ wauc between attack target and attacked flow. |
+| wauc                              | wauc_attacked_to_groundtruth          | _If not targeted:_ wauc between ground truth and attacked flow. |
+| own_epe                           | own_epe_attacked_to_target          | _If targeted:_ AEPE between attack target and attacked flow. |
+| own_epe                           | own_epe_attacked_to_groundtruth          | _If not targeted:_ AEPE between ground truth and attacked flow. |
 | epe_orig_preds                    |           | AEPE between unattacked flow and attacked flow |
 | own_epe_orig_preds                |           | (same as epe_orig_preds but differently calculated) |
 | cosim_target                      |           | Cosine similarity between attack target and attacked flow |
@@ -286,21 +299,21 @@ FlowBench logs experiments under `args.output_path`, on this fork the default is
 | epe_ground_truth                  |           | AEPE between ground truth and attacked flow |
 | own_epe_ground_truth              |           | (same as epe_ground_truth but differently calculated) |
 | cosim_ground_truth                |           | Cosine similarity between ground truth and attacked flow          |
-| l2_delta1                         |           | l2 norm of perturbation on frame 1           |
-| l2_delta2                         |           | l2 norm of perturbation on frame 2           |
-| l2_delta12                        |           | l2 norm of combined perturbation on both frames           |
-| l0_delta1                         |           | l0 norm of perturbation on frame 1           |
-| l0_delta2                         |           | l0 norm of perturbation on frame 2           |
-| l0_delta12                        |           | l0 norm of combined perturbation on both frames           |
-| l_inf_delta1                      |           | l_inf norm of perturbation on frame 1           |
-| l_inf_delta2                      |           | l_inf norm of perturbation on frame 2           |
-| l_inf_delta12                     |           | l_inf norm of combined perturbation on both frames           |
 | epe_initial_to_negative           |           | AEPE between attacked flow and negative unattacked flow |
 | epe_initial_to_zero               |           | AEPE between attacked flow and zero flow (that is average flow magnitude) |
 | epe_ground_truth_to_negative      |           | AEPE between ground truth and negative unattacked flow          |
 | epe_ground_truth_to_zero          |           | AEPE between ground truth and zero flow (that is average flow magnitude) |
 | own_epe_ground_truth_to_negative  |           | (same as epe_ground_truth_to_negative but differently calculated) |
 | own_epe_ground_truth_to_zero      |           | (same as own_epe_ground_truth_to_zero but differently calculated) |
+| l2_delta1                         |           | l2 norm of perturbation on frame 1           |
+| l2_delta2                         |           | l2 norm of perturbation on frame 2           |
+| l2_delta12                        |           | l2 norm of combined perturbation on both frames           |
+| l0_delta1                         |           | l0 norm of perturbation on frame 1           |
+| l0_delta2                         |           | l0 norm of perturbation on frame 2           |
+| l0_delta12                        |           | l0 norm of combined perturbation on both frames           |
+| l_inf_delta1                      |           | l_inf norm of perturbation on frame 1         |
+| l_inf_delta2                      |           | l_inf norm of perturbation on frame 2         |
+| l_inf_delta12                     |           | l_inf norm of combined perturbation on both frames           |
 
 Abbreviations:
 
