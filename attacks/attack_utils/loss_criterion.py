@@ -11,6 +11,7 @@ class LossCriterion:
             self.nn_criterion = nn.MSELoss(reduction="none")
 
     def loss(self, flow_1, flow_2):
+        assert flow_1.shape[1] == 2, flow_1.shape
         if self.name == "epe":
             return epe(flow_1, flow_2)
         else:

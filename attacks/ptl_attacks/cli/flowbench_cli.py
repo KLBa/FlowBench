@@ -1,9 +1,6 @@
 
 from typing import Optional, Type
 from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
-from lightning.pytorch.cli import (
-    LightningArgumentParser,
-)
 
 class FlowBenchCLI(PTLFlowCLI):
     
