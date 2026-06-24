@@ -104,6 +104,8 @@ bash download_weather_files.sh
 > :warning: I'm not using the Python API and `flowbench.evals`, so they're likely to be broken on this fork.
 > Skip to the [Commandline Interface](#command-line-interface).
 
+<details><summary>Click to view old Python interface.</summary>
+
 #### Model Zoo
 
 ```python
@@ -224,6 +226,7 @@ model, results = evaluate(
 - `retrieve_existing`: Works as described above
 - `threat_model`: Must be `'3DCommonCorruption'`; returns evaluations across 8 corruption types
 - `severity`: An integer from 1 to 5 indicating the corruption severity
+</details>
 
 ### Command Line Interface
 
