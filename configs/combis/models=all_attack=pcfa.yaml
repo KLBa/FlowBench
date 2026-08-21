@@ -12,5 +12,5 @@ config_3:
   - configs/partial_configs/data/sintel-final-trainval.yaml
 
 # global configs, passed to all calls (unless overwritten in configs above; not sure about resolution order) 
-output_path: outputs/flowbench_objectapi/combis
+output_path: outputs/flowbench_dev-fork/combis
 write_outputs: False
