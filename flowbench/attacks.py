@@ -1157,6 +1157,7 @@ def attack_one_dataloader(
                 del perturbed_inputs
             torch.cuda.empty_cache()
 
+        num_samples = i+1
     if args.write_individual_metrics:
         ind_df = pd.DataFrame(metrics_individual)
         args.output_path.mkdir(parents=True, exist_ok=True)
@@ -1167,6 +1168,8 @@ def attack_one_dataloader(
     metrics_mean = {}
     for k, v in metrics_sum.items():
         metrics_mean[k] = v / len(dataloader)
+    
+    metrics_mean["num_samples"] = num_samples
 
     iteration_metrics_mean = {}
     for k, v in iteration_metrics_sum.items():
