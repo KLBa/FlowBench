@@ -1,0 +1,6 @@
+
+model:
+  class_path: ptlflow.models.ccmr
+  init_args:
+    iters: [4, 6, 8]
+ckpt_path: sintel
