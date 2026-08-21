@@ -1,0 +1,6 @@
+
+model:
+  class_path: ptlflow.models.raft
+  init_args:
+    iters: 12
+ckpt_path: kitti
