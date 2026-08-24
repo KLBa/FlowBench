@@ -1,0 +1,16 @@
+# cd FlowBench
+# python -m flowbench.attacks_combis --config configs/combis/models=all_attack=none.yaml --data.dataset_config_path ...
+
+config_1:
+  - configs/partial_configs/attacks/none.yaml
+config_2:
+  - configs/partial_configs/models/*
+config_3:
+  - configs/partial_configs/data/kitti-2015-trainval.yaml
+  - configs/partial_configs/data/sintel-final-trainval.yaml
+
+# global configs, passed to all calls (unless overwritten in configs above; not sure about resolution order) 
+output_path: outputs/flowbench_dev-fork/combis
+write_outputs: False
+skip_existing: True
+ignore_errors: True
