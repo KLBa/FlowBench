@@ -116,6 +116,8 @@ def _init_parser() -> ArgumentParser:
         default=None,
         help=("Path to a ckpt file for the chosen model."),
     )
+    parser.add_argument("--skip_existing", action="store_true",
+        help="skip evaluation if matching output already exists in target directory")
     parser.add_argument(
         "--attack",
         type=str,
@@ -697,6 +699,30 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBen
             iteration_data.append((key, value))
         logger.info(f"Attack arguments: {attack_args}")
         for dataset_name, dl in dataloaders.items():
+            output_filename = args.output_path / f"metrics_{args.data.val_dataset}.json"
+            output_data.append(("dataset", dataset_name))
+            iteration_data.append(("dataset", dataset_name))
+            if args.skip_existing:
+                if os.path.exists(output_filename):
+                    with open(output_filename, "r") as f:
+                        experiments = json.load(f)
+                        for i, exp in enumerate(experiments["experiments"]):
+                            match = True
+                            for key, val in output_data:
+                                if key in [
+                                    "start_time", "end_time", "duration", "metrics"
+                                ]:
+                                    continue
+                                else:
+                                    if exp[key] != val:
+                                        match = False
+                                        logger.info(f"New experiment ({output_filename}): haven't tested {key}={val} so far")
+                                        break
+                            if match is True:
+                                logger.info(f"Experiment already performed in {output_filename}: experiment {i}")
+                                return
+                else:
+                    logger.info(f"New experiment ({output_filename}): new experiment file will be created")
             metrics_mean, iteration_metrics_mean = attack_one_dataloader(
                 args, attack_args, model, dl, dataset_name, data_module=data_module
             )
@@ -712,8 +738,6 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBen
             output_data.append(("duration", time_difference_str))
             iteration_data.append(("duration", time_difference_str))
 
-            output_data.append(("dataset", dataset_name))
-            iteration_data.append(("dataset", dataset_name))
             for k in metrics_mean.keys():
                 output_data.append((k, metrics_mean[k]))
             for k in iteration_metrics_mean.keys():
@@ -727,7 +751,6 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBen
                     output_dict.setdefault("metrics", {})[key.split("/")[1]] = value
                 else:
                     output_dict[key] = value
-            output_filename = args.output_path / f"metrics_{args.data.val_dataset}.json"
 
             if os.path.exists(output_filename) and not overwrite_flag:
                 with open(output_filename, "r") as json_file:

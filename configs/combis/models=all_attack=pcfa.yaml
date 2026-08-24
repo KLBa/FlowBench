@@ -1,5 +1,5 @@
 # cd FlowBench
-# python -m flowbench.attacks_combis --config configs/combis/models=all_attack=pcfa --data.dataset_config_path ...
+# python -m flowbench.attacks_combis --config configs/combis/models=all_attack=pcfa.yaml --data.dataset_config_path ...
 
 config_1:
   - configs/partial_configs/attacks/pcfa_it=1_eps=5e-3_box=cov.yaml
@@ -14,3 +14,5 @@ config_3:
 # global configs, passed to all calls (unless overwritten in configs above; not sure about resolution order) 
 output_path: outputs/flowbench_dev-fork/combis
 write_outputs: False
+skip_existing: True
+ignore_errors: True

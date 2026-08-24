@@ -2,11 +2,12 @@
 Runs flowbench.attack multiple times on a combination of configs.
 That is, you can pass up to three lists of configs.
 
-python -m flowbench.attacks_combis --config configs/combis/raft-pcfa.yaml --data.dataset_config_path ../ptlflow-mirror/datasets_sarinagara.yaml --ignore_error
+python -m flowbench.attacks_combis --config configs/combis/raft-pcfa.yaml --data.dataset_config_path ../ptlflow-mirror/datasets_sarinagara.yaml --ignore_errors
 """
 
 from glob import glob
 import itertools
+import os
 from pathlib import Path
 import sys
 from typing import List
@@ -42,7 +43,7 @@ def _init_parser() -> ArgumentParser:
         help=("List of configs."),
     )
     parser.add_argument(
-        "--ignore_error",
+        "--ignore_errors",
         action="store_true",
         help=("When an evaluation of one config combination fails, continue with the next."),
     )
@@ -77,7 +78,7 @@ if __name__ == "__main__":
     )
     cfg = cli.config
     
-    ignore_error = cli.config["ignore_error"]
+    ignore_errors = cli.config["ignore_errors"]
     config_lists = [
         cli.config["config_1"],
         cli.config["config_2"],
@@ -126,8 +127,11 @@ if __name__ == "__main__":
             model = restore_model(model, cfg.ckpt_path)
         
             metrics_df = attack(cfg, model, cli.datamodule)
+            
+            for fn in glob(os.path.expanduser("~/.cache/torch/hub/checkpoints/*.ckpt")):
+                os.remove(fn)
         except Exception as e:
             logger.error(f"Config combination {config_paths} failed with error:")
             logger.error(f"{type(e)}: {e}")
-            if not ignore_error:
+            if not ignore_errors:
                 raise e
