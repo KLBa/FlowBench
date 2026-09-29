@@ -87,8 +87,9 @@ if __name__ == "__main__":
     # expand globs and remove empty lists
     config_lists = [preprocess_config_list(x) for x in config_lists if len(x) > 0]
     
-    combis = itertools.product(*config_lists)
-    for config_paths in combis:
+    combis = list(itertools.product(*config_lists))
+    for i, config_paths in list(enumerate(combis)):
+        logger.info(f"Testing combination {i}/{len(combis)}: {config_paths}")
         try:
             args = sys.argv[1:]
             for c in config_paths:
@@ -128,8 +129,10 @@ if __name__ == "__main__":
         
             metrics_df = attack(cfg, model, cli.datamodule)
             
-            for fn in glob(os.path.expanduser("~/.cache/torch/hub/checkpoints/*.ckpt")):
-                os.remove(fn)
+            if i % (len(cli.config.get("config_3", [None])) * 4) == 0:
+                for fn in glob(os.path.expanduser("~/.cache/torch/hub/checkpoints/*.ckpt")):
+                    os.remove(fn)
+                    logger.info(f"Removed {fn}")
         except Exception as e:
             logger.error(f"Config combination {config_paths} failed with error:")
             logger.error(f"{type(e)}: {e}")
