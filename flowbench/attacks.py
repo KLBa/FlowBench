@@ -716,11 +716,11 @@ def attack(args: Namespace, model: BaseModel, data_module: FlowDataModuleFlowBen
                                 else:
                                     if exp[key] != val:
                                         match = False
-                                        logger.info(f"New experiment ({output_filename}): haven't tested {key}={val} so far")
                                         break
                             if match is True:
                                 logger.info(f"Experiment already performed in {output_filename}: experiment {i}")
                                 return
+                        logger.info(f"New experiment ({output_filename}): haven't tested {key}={val} so far")
                 else:
                     logger.info(f"New experiment ({output_filename}): new experiment file will be created")
             metrics_mean, iteration_metrics_mean = attack_one_dataloader(
