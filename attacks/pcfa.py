@@ -1,7 +1,7 @@
 from argparse import Namespace
 from typing import Any, Dict, List, Optional
 import torch
-from ptlflow.models.base_model.base_model import BaseModel
+from ptlflow.models.base_model.base_model import BaseModel, logger
 from attacks.attack_utils.utils import (
     get_image_tensors,
     get_image_grads,
@@ -60,7 +60,7 @@ def pcfa(
 
 def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attack_args):
     """Subroutine to optimize a PCFA perturbation on a given image pair. For a specified number of steps."""
-
+    printed_grads_warning = False
     # For logging of different norms for the deltas and EPE for each iteration
     iteration_metrics = {}
 
@@ -175,6 +175,20 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
                 f_type=attack_args["attack_loss"],
             )
             loss_closure.backward()
+
+            # check that gradients are non-zero
+            nonlocal printed_grads_warning
+            if not printed_grads_warning:
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+                        if param.grad is None:
+                            logger.warning(f"{name}: NO GRADIENT (not in graph)")
+                            printed_grads_warning = True
+                        elif torch.all(param.grad == 0):
+                            logger.warning(f"{name}: grad is all zero")
+                            printed_grads_warning = True
+                        else:
+                            logger.debug(f"{name}: grad norm = {param.grad.norm().item():.6f}")
 
             return loss_closure
 
