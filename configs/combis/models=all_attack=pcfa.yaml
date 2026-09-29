@@ -2,7 +2,7 @@
 # python -m flowbench.attacks_combis --config configs/combis/models=all_attack=pcfa.yaml --data.dataset_config_path ...
 
 config_1:
-  - configs/partial_configs/attacks/pcfa_it=1_eps=5e-3_box=cov.yaml
+  # - configs/partial_configs/attacks/pcfa_it=1_eps=5e-3_box=cov.yaml
   - configs/partial_configs/attacks/pcfa_it=20_eps=5e-3_box=cov.yaml
   - configs/partial_configs/attacks/pcfa_it=20_eps=5e-2_box=cov.yaml
 config_2:
