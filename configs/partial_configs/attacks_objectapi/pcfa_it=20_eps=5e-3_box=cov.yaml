@@ -1,0 +1,8 @@
+
+attack_obj:
+  class_path: attacks.ptl_attacks.pcfa.pcfa.pcfa
+  init_args:
+    attack_iterations: 20
+    attack_epsilon: 0.005
+    attack_alpha: 1e-7
+    pcfa_boxconstraint: change_of_variables

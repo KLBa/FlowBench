@@ -16,8 +16,9 @@ from loguru import logger
 
 from ptlflow import restore_model
 from ptlflow.utils.registry import RegisteredModel
-from .attacks import FlowDataModuleFlowBench, PTLFlowCLI, attack
-from .attacks import _init_parser as _init_attacks_parser
+from attacks.ptl_attacks.registry import RegisteredAttack
+from .attacks_refactored import FlowDataModuleFlowBench, FlowBenchCLI, attack_single
+from .attacks_refactored import _init_parser as _init_attacks_parser
 
 
 def _init_parser() -> ArgumentParser:
@@ -66,7 +67,8 @@ if __name__ == "__main__":
     parser_attacks = _init_attacks_parser()
     
     args = sys.argv[1:] + ["--model", "raft"]
-    cli = PTLFlowCLI(
+    cli = FlowBenchCLI(
+        attack_class=RegisteredAttack,
         model_class=RegisteredModel,
         subclass_mode_model=True,
         datamodule_class=FlowDataModuleFlowBench,
@@ -95,7 +97,8 @@ if __name__ == "__main__":
             for c in config_paths:
                 args.extend(["--config", c])
 
-            cli = PTLFlowCLI(
+            cli = FlowBenchCLI(
+                attack_class=RegisteredAttack,
                 model_class=RegisteredModel,
                 subclass_mode_model=True,
                 datamodule_class=FlowDataModuleFlowBench,
@@ -107,7 +110,6 @@ if __name__ == "__main__":
             )
             cfg = cli.config
             
-        
             cfg.model_name = cfg.model.class_path.split(".")[-1]
             model_id = cfg.model_name
 
@@ -127,7 +129,7 @@ if __name__ == "__main__":
             model = cli.model
             model = restore_model(model, cfg.ckpt_path)
         
-            metrics_df = attack(cfg, model, cli.datamodule)
+            metrics_df = attack_single(cfg, model, cli.datamodule, cli.attack)
             
             if i % (len(cli.config.get("config_3", [None])) * 4) == 0:
                 for fn in glob(os.path.expanduser("~/.cache/torch/hub/checkpoints/*.ckpt")):

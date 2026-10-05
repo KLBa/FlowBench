@@ -105,6 +105,8 @@ def _init_parser() -> ArgumentParser:
         default=None,
         help=("Path to a ckpt file for the chosen model."),
     )
+    parser.add_argument("--skip_existing", action="store_true",
+        help="If set, skip evaluation if matching output already exists in target directory")
     
     parser.add_argument(
         "--output_path",
@@ -220,33 +222,55 @@ def attack_single(
     overwrite_flag = args.overwrite_output
     output_data = []
     iteration_data = []
+    
     start_time = datetime.now()
-    output_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
+    logging_data = {"start_time": start_time.strftime("%Y-%m-%d %H:%M:%S")}
     output_data.append(("model", args.model.as_dict()))
     output_data.append(("checkpoint", args.ckpt_path))
     output_data.append(("attack", args.attack_obj.as_dict()))
-    iteration_data.append(("start_time", start_time.strftime("%Y-%m-%d %H:%M:%S")))
     iteration_data.append(("model", args.model.as_dict()))
     iteration_data.append(("checkpoint", args.ckpt_path))
     iteration_data.append(("attack", args.attack_obj.as_dict()))
 
     logger.info(f"Attack arguments: {args.attack_obj}")
     for dataset_name, dl in dataloaders.items():
+        output_filename = args.output_path / f"metrics_{args.data.val_dataset}.json"
+        output_data.append(("dataset", dataset_name))
+        iteration_data.append(("dataset", dataset_name))
+        if args.skip_existing:
+            if os.path.exists(output_filename):
+                with open(output_filename, "r") as f:
+                    experiments = json.load(f)
+                    for i, exp in enumerate(experiments["experiments"]):
+                        match = True
+                        for key, val in output_data:
+                            if key in [
+                                "start_time", "end_time", "duration", "metrics"
+                            ]:
+                                continue
+                            else:
+                                if exp[key] != val:
+                                    match = False
+                                    break
+                        if match is True:
+                            logger.info(f"Experiment already performed in {output_filename}: experiment {i}")
+                            return
+                    logger.info(f"New experiment ({output_filename}): haven't tested {key}={val} so far")
+            else:
+                logger.info(f"New experiment ({output_filename}): new experiment file will be created")
         metrics_mean, iteration_metrics_mean = attack_one_dataloader(
             args, attack, model, dl, dataset_name, data_module=data_module
         )
         end_time = datetime.now()
-        output_data.append(("end_time", end_time.strftime("%Y-%m-%d %H:%M:%S")))
-        iteration_data.append(("end_time", end_time.strftime("%Y-%m-%d %H:%M:%S")))
+        logging_data["end_time"] = end_time.strftime("%Y-%m-%d %H:%M:%S")
         time_difference = end_time - start_time
         hours = time_difference.seconds // 3600
         minutes = (time_difference.seconds % 3600) // 60
         seconds = time_difference.seconds % 60
         time_difference_str = "{:02}:{:02}:{:02}".format(hours, minutes, seconds)
-        output_data.append(("duration", time_difference_str))
-        iteration_data.append(("duration", time_difference_str))
-        output_data.append(("dataset", dataset_name))
-        iteration_data.append(("dataset", dataset_name))
+        logging_data["duration"] = time_difference_str
+        output_data.append(("meta", logging_data))
+        iteration_data.append(("meta", logging_data))
         for k in metrics_mean.keys():
             output_data.append((k, metrics_mean[k]))
         for k in iteration_metrics_mean.keys():
@@ -258,7 +282,6 @@ def attack_single(
                 output_dict.setdefault("metrics", {})[key.replace("val/", "")] = value
             else:
                 output_dict[key] = value
-        output_filename = args.output_path / f"metrics_{args.data.val_dataset}.json"
         if os.path.exists(output_filename) and not overwrite_flag:
             with open(output_filename, "r") as json_file:
                 metrics = json.load(json_file)
@@ -391,8 +414,8 @@ def attack_one_dataloader(
             has_ground_truth = True
             targeted_inputs = None
 
+            # Evaluate model on clean input
             with torch.no_grad():
-
                 orig_preds = model(inputs)
             torch.cuda.empty_cache()
 
@@ -411,6 +434,8 @@ def attack_one_dataloader(
 
             iteration_metrics = {}
             
+            
+            # Perform attack
             if isinstance(attack_args, BaseAttack):
                 
                 # debugging only
@@ -741,8 +766,8 @@ def attack_one_dataloader(
 
             if metrics_individual is not None:
                 metrics_individual["filename"].append(filename)
-                metrics_individual["epe"].append(metrics["val/epe"].item())
-                metrics_individual["flall"].append(metrics["val/flall"].item())
+                for key in metrics:
+                    metrics_individual.setdefault(key, []).append(metrics[key].item())
 
             generate_outputs(args,
                              preds,
@@ -750,8 +775,10 @@ def attack_one_dataloader(
                              i,
                              inputs.get("meta"),
                              perturbed_inputs,
-                             attack_args={"attack_name": attack_args.__class__.__name__,
-                                          **attack_args.hparams},
+                             attack_args={
+                                 "attack_name": attack_args.__class__.__name__,
+                                 **attack_args.hparams
+                            },
                              )
             if args.max_samples is not None and i >= (args.max_samples - 1):
                 break
@@ -795,7 +822,7 @@ def generate_outputs(
     batch_idx: int,
     metadata: Optional[Dict[str, Any]] = None,
     perturbed_inputs: Optional[Dict[str, torch.Tensor]] = None,
-    attack_args: Optional[Dict[str, List[object]]] = None,
+    attack_args: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Display on screen and/or save outputs to disk, if required.
 
