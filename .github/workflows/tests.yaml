@@ -11,8 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - python: "3.9"
-            packages: "torch==2.4.1 torchvision==0.19.1"
           - python: "3.10"
             packages: "torch==2.5.1 torchvision==0.20.1"
           - python: "3.11"
@@ -57,11 +55,11 @@ jobs:
         run: pip install "setuptools<81" imagecorruptions cospgd
 
       - name: Install project
-        run: pip install -e . pytest
+        run: pip install -e .
 
       - name: Show versions
         run: python -c "import sys, torch; print(sys.version); print(torch.__version__)"
 
       - name: Run tests
         working-directory: tests
-        run: (while true; do date +%T; free -m | sed -n 2p; sleep 5; done) & bash test_attacks_objectapi.sh
+        run: bash test_attacks_objectapi.sh
