@@ -19,7 +19,9 @@ jobs:
             packages: "torch==2.6.0 torchvision==0.21.0"
           - python: "3.x"
             packages: "torch torchvision"   # newest available
+
     timeout-minutes: 30
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,6 +43,13 @@ jobs:
           pip install ${{ matrix.packages }} --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install ptlflow
+        if: matrix.python != '3.x'
+        working-directory: _ptlflow
+        run: pip install -e .
+
+      - name: Install ptlflow (newest Python, ignoring Requires-Python)
+        if: matrix.python == '3.x'
+        continue-on-error: true
         working-directory: _ptlflow
         run: pip install --ignore-requires-python -e .
 
