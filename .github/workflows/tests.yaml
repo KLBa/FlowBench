@@ -62,4 +62,4 @@ jobs:
 
       - name: Run tests
         working-directory: tests
-        run: bash test_attacks_objectapi.sh
+        run: pytest
