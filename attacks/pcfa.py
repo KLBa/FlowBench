@@ -23,23 +23,27 @@ def pcfa(
     Performs an PCFA attack on a given model and for all images of a specified dataset.
     """
 
-    optim_mu = 2500.0 / attack_args["attack_epsilon"]
+    if attack_args.get("optim_mu", None) is not None:
+        optim_mu = attack_args["optim_mu"]
+    else:
+        optim_mu = 2500.0 / attack_args["attack_epsilon"]
 
-    if attack_args["attack_epsilon"] == 0.01:
-        optim_mu = 100000
-    elif attack_args["attack_epsilon"] == 0.001:
-        optim_mu = 1000000
+        if attack_args["attack_epsilon"] == 0.01:
+            optim_mu = 100000
+        elif attack_args["attack_epsilon"] == 0.001:
+            optim_mu = 1000000
 
-    if attack_args["attack_target"] not in ["zero"]:
-        optim_mu = 1.5 * optim_mu
+        if attack_args["attack_target"] not in ["zero"]:
+            optim_mu = 1.5 * optim_mu
 
     eps_box = attack_args["attack_alpha"]
 
     # Define what device we are using
-    if not torch.cuda.is_available():
-        device = torch.device("cpu")
-    else:
-        device = torch.device("cuda")
+    device = model.device
+    # if not torch.cuda.is_available():
+    #   device = torch.device("cpu")
+    # else:
+    #   device = torch.device("cuda")
 
     # Make sure the model is not trained:
     for param in model.parameters():
@@ -104,7 +108,11 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
     nw_input1.requires_grad = True
     nw_input2.requires_grad = True
 
-    optimizer = optim.LBFGS([nw_input1, nw_input2], max_iter=10)
+    if attack_args.get("optim_strong_wolfe", False) is True:
+        optimizer = optim.LBFGS([nw_input1, nw_input2], max_iter=10, line_search_fn="strong_wolfe")
+    else:
+        # This is the original version but it may massively overshoot delta bound!
+        optimizer = optim.LBFGS([nw_input1, nw_input2], max_iter=10)
 
     # Predict the flow
     preds = model(inputs, nw_input1, nw_input2)
@@ -175,6 +183,8 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
                 f_type=attack_args["attack_loss"],
             )
             loss_closure.backward()
+            
+            logger.info(f"step {steps}: loss_closure {loss_closure.item()}")
 
             # check that gradients are non-zero
             nonlocal printed_grads_warning
@@ -210,6 +220,19 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
         preds = model(inputs, nw_input1, nw_input2)
         flow_pred = preds["flows"].squeeze(0)
         flow_pred = flow_pred.to(device)
+
+        if DEBUG := True:
+            loss_closure = losses.loss_delta_constraint(
+                flow_pred,
+                target,
+                delta1,
+                delta2,
+                device,
+                delta_bound=attack_args["attack_epsilon"],
+                mu=optim_mu,
+                f_type=attack_args["attack_loss"],
+            )
+            logger.info(f"step {steps}: final loss {loss_closure.item()}")
 
         #pdb.set_trace()
         # save nw_inputs and deltas and flow_pred

@@ -2,17 +2,19 @@
 
 This repository provides comprehensive tools and pre-trained models for benchmarking the robustness of optical flow estimation algorithms.
 
-[Link to Paper](https://openreview.net/forum?id=Kh4bj6YDNm)
-
-[YouTube Video](https://youtu.be/_AUKi_48vmc)
-
-Accepted at Transactions on Machine Learning Research (TMLR), 2025
+> This repository is a fork of [shashankskagnihotri/FlowBench](https://github.com/shashankskagnihotri/FlowBench).
+>
+> [Link to Paper](https://openreview.net/forum?id=Kh4bj6YDNm)
+>
+> [YouTube Video](https://youtu.be/_AUKi_48vmc)
+>
+> Accepted at Transactions on Machine Learning Research (TMLR), 2025
 
 ---
 
 ## Installation
 
-This package requires **Python 3.1x.x** (tested with 3.13.5). Please ensure you have a compatible Python version installed.
+This package requires **Python 3.1x.x** (tested with 3.14.3). Please ensure you have a compatible Python version installed.
 
 ### Step 1: Clone the repository including submodules
 
@@ -22,25 +24,37 @@ git clone --recurse-submodules <url>
 git submodule update --init --recursive
 ```
 
-<details><summary>Install dependencies as you encounter them while running the code.</summary>
+### Step 2: Install dependencies
 
-### ~~Step 1: Run the installation script~~
-
-Refer to `install.sh` for how the FlowBench's authors installed packages but you may need different versions, e.g., the PyTorch version depends on your CUDA version, `spatial-correlation-sampler` is notoriously not working for me and `alt_cuda_corr` is also growing increasingly old...
+FlowBench requires [`ptlflow`](https://github.com/hmorimitsu/ptlflow) for loading models.
+I recommend a local install
 
 ```bash
-bash install.sh
+git clone git@github.com:hmorimitsu/ptlflow.git
+cd ptlflow
+pip install -e .
+cd ..
 ```
 
-</details>
+Other dependencies:
 
-### Step 2: Install this package in development mode
+```bash
+pip install "setuptools<81" imagecorruptions cospgd
+```
 
-After running the installation script, install the core `flowbench` package:
+### Step 3: Install this package in development mode
 
 ```bash
 pip install -e .
 ```
+
+### Step 4: Test run
+
+```bash
+python -m flowbench.attacks_refactored --model raft --ckpt_path chairs --data.val_dataset kitti-2015-trainval --attack_obj pcfa --attack_obj.attack_iterations 5
+```
+
+Install any dependencies as they occur... Sorry for not keeping this consistent.
 
 ---
 
@@ -238,7 +252,7 @@ Example:
 python -m flowbench.attacks_refactored \
     --model raft --ckpt_path chairs --model.iters 1 \
     --data.val_dataset kitti-2015-trainval --data.dataset_config_path datasets.yaml \
-    --attack_obj pcfa --attack_obj.attack_iterations 1 --attack_obj.attack_epsilon 1
+    --attack_obj pcfa --attack_obj.attack_iterations 1 --attack_obj.attack_epsilon 0.05 --attack_obj.attack_alpha 1e-7
 ```
 
 FlowBench's CLI extends ptlflow's CLI.
@@ -252,7 +266,7 @@ All arguments defining the model and data are inherited from ptlflow.
 - `--ckpt_path` a file path to the checkpoint or a shorthand (typically `chairs`, `things`, `sintel`) defined by ptlflow
 - `--data.val_dataset` the dataset the attack will be performed on
   - (Note that `--data.train_dataset` and `--data.test_dataset` are ignored!)
-- `--data.dataset_config_path` a path a yaml file defining the dataset paths
+- `--data.dataset_config_path` a path to a yaml file defining the dataset paths
 
 #### FlowBench-specific args
 
@@ -278,6 +292,8 @@ FlowBench logs experiments under `args.output_path`, on this fork the default is
 
 > :warning: Metrics with `own_` pre-prepended ignore the `valid` map.
 > This is fine when comparing to anything except ground truth...  
+
+This fork renamed metrics:
 
 | Previous name                     | New name  | Meaning   |
 |---                                |---        |---        |

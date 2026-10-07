@@ -1,7 +1,13 @@
 # Changelog
 
-## 2026-05-27 commits from 818794e to HEAD
+## 2026-10-07 commits from 3b4863f to HEAD
 
+* Add GitHub action test
+* PCFA: Add flag `optim_strong_wolfe` to avoid loss spikes.
+
+## 2026-05-27 commits from 818794e to 3b4863f
+
+* Add attack_combis
 * Add and rename logged metrics.
   * Added metrics: Basically compare all available flow fields against all available flow fields and don't select pairs to compare.
   * Rename metrics: The standard names are confusing. I hope my mechanic naming scheme serves better...

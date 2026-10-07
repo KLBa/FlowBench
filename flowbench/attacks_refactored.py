@@ -364,6 +364,8 @@ def attack_one_dataloader(
 
     metrics_sum = {}
     iteration_metrics_sum = {}
+    metrics_max = {}
+    iteration_metrics_max = {}
     # if attack_args["attack"] == "weather":
     #     attack_args["model"] = args.model
 
@@ -381,7 +383,7 @@ def attack_one_dataloader(
 
     metrics_individual = None
     if args.write_individual_metrics:
-        metrics_individual = {"filename": [], "epe": [], "flall": []}
+        metrics_individual = {"filename": []}
 
     with tqdm(dataloader) as tdl:
         prev_preds = None
@@ -438,19 +440,6 @@ def attack_one_dataloader(
             # Perform attack
             if isinstance(attack_args, BaseAttack):
                 
-                # debugging only
-                if os.path.exists("'outputs/debugging/inputs.pth'"):
-                    inputs_old = torch.load('outputs/debugging/inputs.pth', weights_only=False)
-                    model_old = torch.load('outputs/debugging/model.pth', weights_only=False)
-                    target_old = torch.load('outputs/debugging/targeted_inputs.pth', weights_only=False)
-                    
-                    logger.warning('Check against v0.1.1')
-                    if not attack_args.precomputed:
-                        assert torch.all(inputs_old["images"] == inputs["images"])
-                    # assert model_old == model
-                    if targeted_inputs:
-                        assert torch.all(target_old["flows"] == targeted_inputs["flows"])
-                
                 attack_obj = attack_args
                 outputs = attack_obj({'inputs': inputs, 'model': model, 'targeted_inputs': targeted_inputs})
 
@@ -465,39 +454,13 @@ def attack_one_dataloader(
             else:
                 raise ValueError("expecting attack as object")
 
-            # debugging only
-            if os.path.exists("outputs/debugging/preds.pth"):
-                preds_old = torch.load('outputs/debugging/preds.pth', weights_only=False)
-                perturbed_inputs_old = torch.load('outputs/debugging/perturbed_inputs.pth', weights_only=False)
-                iteration_metrics_old = torch.load('outputs/debugging/iteration_metrics.pth', weights_only=False)
-
-                logger.warning('Check preds against v0.1.1')
-                assert torch.allclose(perturbed_inputs_old["images"], perturbed_inputs["images"]), torch.abs(perturbed_inputs_old["images"] - perturbed_inputs["images"]).max()
-                assert torch.all(perturbed_inputs_old["images"] == perturbed_inputs["images"])
-                assert torch.all(perturbed_inputs_old["flows"] == perturbed_inputs["flows"])
-
-                assert torch.all(preds_old["flows"] == preds["flows"])
-
-                assert "val/l2_delta1_i1" in iteration_metrics_old, iteration_metrics_old
-                logger.debug(f"iteration_metrics_old.keys() == {iteration_metrics_old.keys()}")
-                assert torch.all(iteration_metrics_old["val/l2_delta1_i1"] == iteration_metrics_old["val/l2_delta1_i1"]), iteration_metrics_old
-                assert torch.all(iteration_metrics_old["val/l0_delta2_i1"] == iteration_metrics_old["val/l0_delta2_i1"])
-                assert torch.all(iteration_metrics_old["val/l2_delta1_i1"] == iteration_metrics_old["val/l2_delta1_i1"]), iteration_metrics_old
-                assert torch.all(iteration_metrics_old["val/l0_delta2_i1"] == iteration_metrics_old["val/l0_delta2_i1"])
-
             # detach everything
-            for key in preds:
-                if torch.is_tensor(preds[key]):
-                    preds[key] = preds[key].detach()
-            for key in inputs:
-                if torch.is_tensor(inputs[key]):
-                    inputs[key] = inputs[key].detach()
-            for key in perturbed_inputs:
-                if torch.is_tensor(perturbed_inputs[key]):
-                    perturbed_inputs[key] = perturbed_inputs[key].detach()
-            for key in iteration_metrics:
-                if torch.is_tensor(iteration_metrics[key]):
-                    iteration_metrics[key] = iteration_metrics[key].detach()
+            def _detach_dicts(*dicts):
+                for d in dicts:
+                    for key in d:
+                        if torch.is_tensor(d[key]):
+                            d[key] = d[key].detach()
+            _detach_dicts(preds, inputs, perturbed_inputs, iteration_metrics)
 
             if args.warm_start:
                 if (
@@ -738,26 +701,10 @@ def attack_one_dataloader(
                 for k, v in delta_dic.items():
                     metrics[k] = v
 
-            for k in metrics.keys():
-                if metrics_sum.get(k) is None:
-                    metrics_sum[k] = 0.0
-                metrics_sum[k] += metrics[k].item()
 
-            for k in iteration_metrics.keys():
-                if iteration_metrics_sum.get(k) is None:
-                    iteration_metrics_sum[k] = 0.0
-                iteration_metrics_sum[k] += iteration_metrics[k].item()
-
-            if torch.cuda.is_available():
-                free, total = torch.cuda.mem_get_info()
-            else:
-                free, total = 0, 0
-            tdl.set_postfix(
-                epe=metrics_sum["val/epe"] / (i + 1),
-                flall=metrics_sum["val/flall"] / (i + 1),
-                total=total,
-                free=free,
-            )
+            ###########################################################
+            # Log adnd store individual (aka sample-specific) metrics #
+            ###########################################################
 
             filename = ""
             if "sintel" in inputs["meta"]["dataset_name"][0].lower():
@@ -780,9 +727,42 @@ def attack_one_dataloader(
                                  **attack_args.hparams
                             },
                              )
+
+            #####################
+            # Aggregate metrics #
+            #####################
+            # Store sum and max of every metric
+            for k in metrics.keys():
+                if metrics_sum.get(k) is None:
+                    metrics_sum[k] = 0.0
+                metrics_sum[k] += metrics[k].item()
+                
+                metrics_max[k] = max(metrics_max.get(k, float("-inf")), metrics[k].item())
+
+            for k in iteration_metrics.keys():
+                if iteration_metrics_sum.get(k) is None:
+                    iteration_metrics_sum[k] = 0.0
+                iteration_metrics_sum[k] += iteration_metrics[k].item()
+
+                iteration_metrics_max[k] = max(iteration_metrics_max.get(k, float("-inf")), iteration_metrics[k].item())
+
+            # Update progress bar
+            if torch.cuda.is_available():
+                free, total = torch.cuda.mem_get_info()
+            else:
+                free, total = 0, 0
+            tdl.set_postfix(
+                epe=metrics_sum["val/epe"] / (i + 1),
+                flall=metrics_sum["val/flall"] / (i + 1),
+                total=total,
+                free=free,
+            )
+
+            # Check for early termination
             if args.max_samples is not None and i >= (args.max_samples - 1):
                 break
 
+            # Clean up
             del preds
             del inputs
             del iteration_metrics
@@ -807,6 +787,10 @@ def attack_one_dataloader(
     for k, v in metrics_sum.items():
         metrics_mean[k] = v / n
     metrics_mean['num_samples'] = n
+    
+    for k, v in metrics_max.items():
+        if "delta" in k:
+            metrics_mean[f"{k}_datasetmax"] = v
 
     iteration_metrics_mean = {}
     for k, v in iteration_metrics_sum.items():
