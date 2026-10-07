@@ -183,8 +183,6 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
                 f_type=attack_args["attack_loss"],
             )
             loss_closure.backward()
-            
-            logger.info(f"step {steps}: loss_closure {loss_closure.item()}")
 
             # check that gradients are non-zero
             nonlocal printed_grads_warning
@@ -220,19 +218,6 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
         preds = model(inputs, nw_input1, nw_input2)
         flow_pred = preds["flows"].squeeze(0)
         flow_pred = flow_pred.to(device)
-
-        if DEBUG := True:
-            loss_closure = losses.loss_delta_constraint(
-                flow_pred,
-                target,
-                delta1,
-                delta2,
-                device,
-                delta_bound=attack_args["attack_epsilon"],
-                mu=optim_mu,
-                f_type=attack_args["attack_loss"],
-            )
-            logger.info(f"step {steps}: final loss {loss_closure.item()}")
 
         #pdb.set_trace()
         # save nw_inputs and deltas and flow_pred
