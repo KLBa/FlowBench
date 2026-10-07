@@ -12,7 +12,7 @@
 
 echo TestAttacks
 
-python -c "from ptlflow.utils.dummy_datasets import write_kitti; write_kitti('./tmp/dummy')"
+python -c "from ptlflow.utils.dummy_datasets import write_kitti; write_kitti('./tmp/dummy', img_size=(97, 64))"
 echo "kitti_2015: ./tmp/dummy/KITTI/2015" > ./datasets.yaml
 
 python -m flowbench.attacks_refactored --model raft --ckpt_path chairs --data.val_dataset kitti-2015-trainval --attack_obj pcfa --attack_obj.attack_iterations 5
