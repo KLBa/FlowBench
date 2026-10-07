@@ -1,0 +1,46 @@
+name: tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.9"
+            torch: "2.4.1"
+            torchvision: "0.19.1"
+          - python: "3.10"
+            torch: "2.5.1"
+            torchvision: "0.20.1"
+          - python: "3.11"
+            torch: "2.6.0"
+            torchvision: "0.21.0"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install PyTorch (CPU build)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==${{ matrix.torch }} torchvision==${{ matrix.torchvision }} \
+            --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install project
+        run: pip install -e . pytest
+
+      - name: Show versions
+        run: python -c "import sys, torch; print(sys.version); print(torch.__version__)"
+
+      - name: Run tests
+        run: cd tests; tests/test_attacks_objectapi.sh
