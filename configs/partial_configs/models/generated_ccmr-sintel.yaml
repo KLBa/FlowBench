@@ -1,3 +1,5 @@
 ckpt_path: sintel
 model:
   class_path: ptlflow.models.ccmr
+  init_args:
+    alternate_corr: False
