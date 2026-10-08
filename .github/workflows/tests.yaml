@@ -63,3 +63,11 @@ jobs:
       - name: Run tests
         working-directory: tests
         run: pytest
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests_outputs-${{ matrix.python }}
+          path: tests/outputs
+          retention-days: 7
