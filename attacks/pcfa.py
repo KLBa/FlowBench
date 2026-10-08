@@ -150,8 +150,8 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
                 if missing == total and not any(prefix.startswith(r + ".") for r in reported):
                     reported.append(prefix)
                     logger.warning(f"{prefix}: no gradient in ALL {total} parameters")
-            if not reported:
-                logger.info("All modules have gradients.")
+            # if not reported:
+            #     logger.debug("All modules have gradients.")
             return reported
 
         def check_param_grads(model, compute_loss):
@@ -180,7 +180,7 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
                 mu=optim_mu, f_type=attack_args["attack_loss"],
             )
 
-        logger.debug("Check param gradients...")
+        # logger.debug("Check param gradients...")
         __modules_without_grad = check_param_grads(model, _loss)
         # Iteration metrics may not we need to log this somewhere...
         iteration_metrics["has_modules_without_grad"] = torch.tensor(len(__modules_without_grad) > 0) # calling code assumes tensor
