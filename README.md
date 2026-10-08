@@ -29,11 +29,10 @@ git submodule update --init --recursive
 ### Step 2: Install dependencies
 
 FlowBench requires [`ptlflow`](https://github.com/hmorimitsu/ptlflow) for loading models.
-I recommend a local install
+I recommend an editable install
 
 ```bash
-git clone git@github.com:hmorimitsu/ptlflow.git
-cd ptlflow
+cd _ptlflow
 pip install -e .
 cd ..
 ```
