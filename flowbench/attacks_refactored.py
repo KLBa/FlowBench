@@ -319,13 +319,14 @@ def attack_single(
                 raise e
             with open(output_filename, "w") as json_file:
                 json.dump(metrics, json_file, indent=4)
-            # Write args to file (If args is a PTLFlowCLI.config, this contains all CLI arguments including defaults)
-            config_path = args.output_path / 'full_configs' / start_time.strftime("%Y%m%d_%H%M%S") / "config.yaml"
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
-                
-            with open(config_path, "w") as f:
-                yaml.dump(args, f)
-                print(f'config saved to {config_path}')
+
+        # Write args to file (If args is a PTLFlowCLI.config, this contains all CLI arguments including defaults)
+        config_path = args.output_path / 'full_configs' / start_time.strftime("%Y%m%d_%H%M%S") / "config.yaml"
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            
+        with open(config_path, "w") as f:
+            yaml.dump(args, f)
+            print(f'config saved to {config_path}')
 
 
 @torch.enable_grad()
@@ -1005,6 +1006,6 @@ if __name__ == "__main__":
     model = cli.model
     model = restore_model(model, cfg.ckpt_path)
     
-    print("cfg.attack", '\n', cli.attack)
+    print("cfg.attack", cli.attack)
     
     metrics_df = attack_single(cfg, model, cli.datamodule, cli.attack)
