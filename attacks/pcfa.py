@@ -1,4 +1,5 @@
 from argparse import Namespace
+from collections import defaultdict
 from typing import Any, Dict, List, Optional
 import torch
 from ptlflow.models.base_model.base_model import BaseModel, logger
@@ -64,7 +65,6 @@ def pcfa(
 
 def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attack_args):
     """Subroutine to optimize a PCFA perturbation on a given image pair. For a specified number of steps."""
-    printed_grads_warning = False
     # For logging of different norms for the deltas and EPE for each iteration
     iteration_metrics = {}
 
@@ -132,6 +132,59 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
     model.zero_grad()
     optimizer.zero_grad()
 
+    if DEBUG := True:
+        def summarize_missing_grads(named_grads):
+            """named_grads: list of (name, grad_or_None)."""
+            stats = defaultdict(lambda: [0, 0])  # prefix -> [num_without_grad, total]
+            for name, g in named_grads:
+                missing = g is None or torch.all(g == 0)
+                parts = name.split(".")
+                for i in range(1, len(parts)):  # every module prefix, excluding the parameter itself
+                    prefix = ".".join(parts[:i])
+                    stats[prefix][1] += 1
+                    stats[prefix][0] += int(missing)
+
+            reported = []
+            for prefix in sorted(stats, key=lambda p: p.count(".")):  # shallowest first
+                missing, total = stats[prefix]
+                if missing == total and not any(prefix.startswith(r + ".") for r in reported):
+                    reported.append(prefix)
+                    logger.warning(f"{prefix}: no gradient in ALL {total} parameters")
+            if not reported:
+                logger.info("All modules have gradients.")
+            return reported
+
+        def check_param_grads(model, compute_loss):
+            params = [(n, p) for n, p in model.named_parameters()]
+            saved = [p.requires_grad for _, p in params]
+            
+            try:
+                for _, p in params:
+                    p.requires_grad_(True)
+                loss = compute_loss()
+                grads = torch.autograd.grad(
+                    loss, [p for _, p in params], allow_unused=True
+                )
+                return summarize_missing_grads([(n, g) for (n, _), g in zip(params, grads)])
+            finally:
+                for (_, p), flag in zip(params, saved):
+                    p.requires_grad_(flag)
+
+        def _loss():
+            flow = model(inputs, nw_input1, nw_input2)["flows"].squeeze(0).to(device)
+            d1, d2 = extract_deltas(nw_input1, nw_input2, image1, image2,
+                                    attack_args["pcfa_boxconstraint"], eps_box=eps_box)
+            return losses.loss_delta_constraint(
+                flow, target, d1, d2, device,
+                delta_bound=attack_args["attack_epsilon"],
+                mu=optim_mu, f_type=attack_args["attack_loss"],
+            )
+
+        logger.debug("Check param gradients...")
+        __modules_without_grad = check_param_grads(model, _loss)
+        # Iteration metrics may not we need to log this somewhere...
+        iteration_metrics["has_modules_without_grad"] = torch.tensor(len(__modules_without_grad) > 0) # calling code assumes tensor
+
     for steps in range(attack_args["attack_iterations"]):
         # Calculate the deltas from the quantities that go into the network
         delta1, delta2 = extract_deltas(
@@ -183,20 +236,6 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
                 f_type=attack_args["attack_loss"],
             )
             loss_closure.backward()
-
-            # check that gradients are non-zero
-            nonlocal printed_grads_warning
-            if not printed_grads_warning:
-                for name, param in model.named_parameters():
-                    if param.requires_grad:
-                        if param.grad is None:
-                            logger.warning(f"{name}: NO GRADIENT (not in graph)")
-                            printed_grads_warning = True
-                        elif torch.all(param.grad == 0):
-                            logger.warning(f"{name}: grad is all zero")
-                            printed_grads_warning = True
-                        else:
-                            logger.debug(f"{name}: grad norm = {param.grad.norm().item():.6f}")
 
             return loss_closure
 
