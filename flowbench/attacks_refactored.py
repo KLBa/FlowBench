@@ -18,6 +18,7 @@
 
 from argparse import ArgumentTypeError
 import ast
+from collections.abc import Iterable
 import sys
 from jsonargparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -43,8 +44,8 @@ from attacks.ptl_attacks.registry import RegisteredAttack
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # adds project root
 
 from attacks.ptl_attacks.cli.flowbench_cli import FlowBenchCLI
-from attacks.ptl_attacks.base_attack.base_attack import BaseAttack
 from attacks.data.flow_datamodule_extended import FlowDataModuleFlowBench
+from attacks.ptl_attacks.base_attack.base_attack import BaseAttack
 
 import attacks.attack_utils.loss_criterion as losses
 from attacks.attack_utils.loss_criterion import LossCriterion
@@ -53,8 +54,6 @@ from attacks.attack_utils.utils import get_flow_tensors, get_image_tensors
 
 from ptlflow import get_model, get_model_reference, restore_model
 from ptlflow.utils.registry import RegisteredModel
-from ptlflow.utils.lightning.ptlflow_cli import PTLFlowCLI
-from ptlflow.data.flow_datamodule import FlowDataModule
 from ptlflow.utils.flow_metrics import FlowMetrics
 from ptlflow.models.base_model.base_model import BaseModel
 from ptlflow.utils import flow_utils
@@ -79,6 +78,7 @@ config_logging()
 
 # import os
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:100"
+
 
 def bool_or_rgb(value):
     if isinstance(value, bool):
@@ -105,9 +105,12 @@ def _init_parser() -> ArgumentParser:
         default=None,
         help=("Path to a ckpt file for the chosen model."),
     )
-    parser.add_argument("--skip_existing", action="store_true",
-        help="If set, skip evaluation if matching output already exists in target directory")
-    
+    parser.add_argument(
+        "--skip_existing",
+        action="store_true",
+        help="If set, skip evaluation if matching output already exists in target directory",
+    )
+
     parser.add_argument(
         "--output_path",
         type=str,
@@ -217,12 +220,13 @@ def attack_single(
     data_module.setup("validate")
     dataloaders = data_module.val_dataloader()
     dataloaders = {
-        data_module.val_dataloader_names[i]: dataloaders[i] for i in range(len(dataloaders))
+        data_module.val_dataloader_names[i]: dataloaders[i]
+        for i in range(len(dataloaders))
     }
     overwrite_flag = args.overwrite_output
     output_data = []
     iteration_data = []
-    
+
     start_time = datetime.now()
     logging_data = {"start_time": start_time.strftime("%Y-%m-%d %H:%M:%S")}
     output_data.append(("model", args.model.as_dict()))
@@ -244,20 +248,24 @@ def attack_single(
                     for i, exp in enumerate(experiments["experiments"]):
                         match = True
                         for key, val in output_data:
-                            if key in [
-                                "start_time", "end_time", "duration", "metrics"
-                            ]:
+                            if key in ["start_time", "end_time", "duration", "metrics"]:
                                 continue
                             else:
                                 if exp[key] != val:
                                     match = False
                                     break
                         if match is True:
-                            logger.info(f"Experiment already performed in {output_filename}: experiment {i}")
+                            logger.info(
+                                f"Experiment already performed in {output_filename}: experiment {i}"
+                            )
                             return
-                    logger.info(f"New experiment ({output_filename}): haven't tested {key}={val} so far")
+                    logger.info(
+                        f"New experiment ({output_filename}): haven't tested {key}={val} so far"
+                    )
             else:
-                logger.info(f"New experiment ({output_filename}): new experiment file will be created")
+                logger.info(
+                    f"New experiment ({output_filename}): new experiment file will be created"
+                )
         metrics_mean, iteration_metrics_mean = attack_one_dataloader(
             args, attack, model, dl, dataset_name, data_module=data_module
         )
@@ -308,25 +316,30 @@ def attack_single(
             else:
                 metrics = {"experiments": []}
             metrics["experiments"].append(iteration_output_dict)
-            
+
             # Check that metrics is serializable before writing an incomplete json
             try:
                 json.dumps(metrics, indent=4)
             except Exception as e:
                 logger.error(f"Exception {e}")
-                logger.info('Tried to serialize:', metrics)
-                logger.info(type(metrics['experiments'][0]['model']))
+                logger.info("Tried to serialize:", metrics)
+                logger.info(type(metrics["experiments"][0]["model"]))
                 raise e
             with open(output_filename, "w") as json_file:
                 json.dump(metrics, json_file, indent=4)
 
         # Write args to file (If args is a PTLFlowCLI.config, this contains all CLI arguments including defaults)
-        config_path = args.output_path / 'full_configs' / start_time.strftime("%Y%m%d_%H%M%S") / "config.yaml"
+        config_path = (
+            args.output_path
+            / "full_configs"
+            / start_time.strftime("%Y%m%d_%H%M%S")
+            / "config.yaml"
+        )
         os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            
+
         with open(config_path, "w") as f:
             yaml.dump(args, f)
-            print(f'config saved to {config_path}')
+            print(f"config saved to {config_path}")
 
 
 @torch.enable_grad()
@@ -336,7 +349,7 @@ def attack_one_dataloader(
     model: BaseModel,
     dataloader: DataLoader,
     dataloader_name: str,
-    data_module: Optional[FlowDataModuleFlowBench] = None
+    data_module: Optional[FlowDataModuleFlowBench] = None,
 ) -> Dict[str, float]:
     """Perform adversarial attack for all examples of one dataloader.
 
@@ -372,7 +385,7 @@ def attack_one_dataloader(
 
     if attack_args.precomputed:
         dataloader = attack_args.preprocess_dataloader(dataloader_name, data_module)
-        
+
     # if attack_args["attack"] == "3dcc":
     #     assert data_module is not None, "The attack 3DCC requires the data_module to be passed."
     #     dataloader = get_dataset_3DCC(
@@ -406,12 +419,16 @@ def attack_one_dataloader(
                 fp16=args.fp16,
             )
             if attack_args.precomputed:
-                inputs["inputs_perturbed"] = io_adapter.prepare_inputs(inputs=inputs["inputs_perturbed"], image_only=True)
+                inputs["inputs_perturbed"] = io_adapter.prepare_inputs(
+                    inputs=inputs["inputs_perturbed"], image_only=True
+                )
             inputs = io_adapter.prepare_inputs(inputs=inputs, image_only=True)
             inputs["prev_preds"] = prev_preds
 
             if inputs["images"].max() > 1.0:
-                raise ValueError(f"Expecting RGB range to be <= 1.0. Actual: [{inputs['images'].min(), inputs['images'].max()}]")
+                raise ValueError(
+                    f"Expecting RGB range to be <= 1.0. Actual: [{inputs['images'].min(), inputs['images'].max()}]"
+                )
                 attack_args["attack_epsilon"] = attack_args["attack_epsilon"] * 255
                 attack_args["attack_alpha"] = attack_args["attack_alpha"] * 255
             has_ground_truth = True
@@ -423,7 +440,9 @@ def attack_one_dataloader(
             torch.cuda.empty_cache()
 
             if attack_args.targeted:
-                targeted_flow_tensor = attack_args.make_target(inputs=inputs, preds=orig_preds)
+                targeted_flow_tensor = attack_args.make_target(
+                    inputs=inputs, preds=orig_preds
+                )
 
                 if not "flows" in inputs:
                     inputs["flows"] = targeted_flow_tensor
@@ -436,21 +455,26 @@ def attack_one_dataloader(
             #     targeted_inputs = inputs.copy()
 
             iteration_metrics = {}
-            
-            
+
             # Perform attack
             if isinstance(attack_args, BaseAttack):
-                
-                attack_obj = attack_args
-                outputs = attack_obj({'inputs': inputs, 'model': model, 'targeted_inputs': targeted_inputs})
 
-                perturbed_inputs = outputs['perturbed_inputs']
+                attack_obj = attack_args
+                outputs = attack_obj(
+                    {
+                        "inputs": inputs,
+                        "model": model,
+                        "targeted_inputs": targeted_inputs,
+                    }
+                )
+
+                perturbed_inputs = outputs["perturbed_inputs"]
                 if "preds" in outputs:
-                    preds = outputs['preds']
+                    preds = outputs["preds"]
                 else:
                     preds = model(perturbed_inputs)
 
-                iteration_metrics = outputs.get('iteration_metrics', {})
+                iteration_metrics = outputs.get("iteration_metrics", {})
 
             else:
                 raise ValueError("expecting attack as object")
@@ -461,6 +485,7 @@ def attack_one_dataloader(
                     for key in d:
                         if torch.is_tensor(d[key]):
                             d[key] = d[key].detach()
+
             _detach_dicts(preds, inputs, perturbed_inputs, iteration_metrics)
 
             if args.warm_start:
@@ -480,9 +505,7 @@ def attack_one_dataloader(
 
             perturbed_inputs = io_adapter.unscale(perturbed_inputs, image_only=True)
             if attack_args.targeted:
-                targeted_inputs = io_adapter.unscale(
-                    targeted_inputs, image_only=True
-                )
+                targeted_inputs = io_adapter.unscale(targeted_inputs, image_only=True)
 
             if inputs["flows"].shape[1] > 1 and args.seq_val_mode != "all":
                 if args.seq_val_mode == "first":
@@ -517,39 +540,51 @@ def attack_one_dataloader(
 
             if attack_args.targeted:
                 flows_to_compare["target"] = targeted_inputs
-                key_pairs.extend([
-                    ("original", "target"),
-                    ("attacked", "target"),
-                ])
+                key_pairs.extend(
+                    [
+                        ("original", "target"),
+                        ("attacked", "target"),
+                    ]
+                )
 
             if has_ground_truth:
                 flows_to_compare["groundtruth"] = inputs
 
-                key_pairs.extend([
-                    ("original", "groundtruth"),
-                    ("attacked", "groundtruth"),
-                ])
+                key_pairs.extend(
+                    [
+                        ("original", "groundtruth"),
+                        ("attacked", "groundtruth"),
+                    ]
+                )
 
             if args["compare_to_targets"]:
                 targeted_flow_tensor_negative = -orig_preds["flows"].clone()
                 targeted_flow_tensor_zero = torch.zeros_like(orig_preds["flows"])
 
                 # include other keys from inputs in case other data is relevant, e.g., "valid" key is used by FlowMetrics
-                flows_to_compare["zero"] = {**inputs, "flows": targeted_flow_tensor_zero}
-                flows_to_compare["negative"] = {**inputs, "flows": targeted_flow_tensor_negative}
+                flows_to_compare["zero"] = {
+                    **inputs,
+                    "flows": targeted_flow_tensor_zero,
+                }
+                flows_to_compare["negative"] = {
+                    **inputs,
+                    "flows": targeted_flow_tensor_negative,
+                }
 
-                key_pairs.extend([
-                    ("original", "zero"),
-                    ("original", "negative"),
-                    ("attacked", "zero"),
-                    ("attacked", "negative"),
-                ])
+                key_pairs.extend(
+                    [
+                        ("original", "zero"),
+                        ("original", "negative"),
+                        ("attacked", "zero"),
+                        ("attacked", "negative"),
+                    ]
+                )
                 # don't compare to ground truth or target
 
             metrics_all_against_all = {}
-            
+
             # compute metrics between every pair of flow fields
-            for (key_1, key_2) in key_pairs:
+            for key_1, key_2 in key_pairs:
                 # exclude specific pairs
                 if (key_1, key_2) == ("zero", "negative"):
                     # difference from zero to negative is always same as orginal to negative
@@ -557,23 +592,26 @@ def attack_one_dataloader(
                 d1 = flows_to_compare[key_1]
                 d2 = flows_to_compare[key_2]
                 m12 = model.val_metrics[0](d1, d2)
-                
+
                 metrics_all_against_all.update(
-                    {f"{metricname}_{key_1}_to_{key_2}": value for metricname, value in m12.items()}
+                    {
+                        f"{metricname}_{key_1}_to_{key_2}": value
+                        for metricname, value in m12.items()
+                    }
                 )
-                
+
                 criterion = LossCriterion("epe")
                 loss_12 = criterion.loss(
-                        d1["flows"].squeeze(0).float(),
-                        d2["flows"].squeeze(0).float(),
+                    d1["flows"].squeeze(0).float(),
+                    d2["flows"].squeeze(0).float(),
                 )
                 loss_12 = loss_12.mean()
                 # if loss_12 != m12["val/epe"]:
                 #     logger.warning(f"FlowBench and ptlflow disagree on EPE between {key_1} and {key_2}. Are there invalid pixels?")
                 metrics_all_against_all[f"val/own_epe_{key_1}_to_{key_2}"] = loss_12
-                metrics_all_against_all[f"val/own_cosim_{key_1}_to_{key_2}"] = torch.mean(
-                    cosine_similarity(
-                        get_flow_tensors(d1), get_flow_tensors(d2)
+                metrics_all_against_all[f"val/own_cosim_{key_1}_to_{key_2}"] = (
+                    torch.mean(
+                        cosine_similarity(get_flow_tensors(d1), get_flow_tensors(d2))
                     )
                 )
 
@@ -688,9 +726,7 @@ def attack_one_dataloader(
                         "val/epe"
                     ]
 
-            metrics.update({
-                f"new/{k}": v for k, v in metrics_all_against_all.items()
-            })
+            metrics.update({f"new/{k}": v for k, v in metrics_all_against_all.items()})
 
             if True:
                 # compute perturbation size
@@ -702,9 +738,8 @@ def attack_one_dataloader(
                 for k, v in delta_dic.items():
                     metrics[k] = v
 
-
             ###########################################################
-            # Log adnd store individual (aka sample-specific) metrics #
+            # Log and store individual (aka sample-specific) metrics #
             ###########################################################
 
             filename = ""
@@ -717,17 +752,18 @@ def attack_one_dataloader(
                 for key in metrics:
                     metrics_individual.setdefault(key, []).append(metrics[key].item())
 
-            generate_outputs(args,
-                             preds,
-                             dataloader_name,
-                             i,
-                             inputs.get("meta"),
-                             perturbed_inputs,
-                             attack_args={
-                                 "attack_name": attack_args.__class__.__name__,
-                                 **attack_args.hparams
-                            },
-                             )
+            generate_outputs(
+                args,
+                preds,
+                dataloader_name,
+                i,
+                inputs.get("meta"),
+                perturbed_inputs,
+                attack_args={
+                    "attack_name": attack_args.__class__.__name__,
+                    **{k: v for k, v in attack_args.__dict__.items() if not k.startswith("_") and (isinstance(v, (str, int, float, bool, Iterable) or v is None))}
+                },
+            )
 
             #####################
             # Aggregate metrics #
@@ -737,15 +773,20 @@ def attack_one_dataloader(
                 if metrics_sum.get(k) is None:
                     metrics_sum[k] = 0.0
                 metrics_sum[k] += metrics[k].item()
-                
-                metrics_max[k] = max(metrics_max.get(k, float("-inf")), metrics[k].item())
+
+                metrics_max[k] = max(
+                    metrics_max.get(k, float("-inf")), metrics[k].item()
+                )
 
             for k in iteration_metrics.keys():
                 if iteration_metrics_sum.get(k) is None:
                     iteration_metrics_sum[k] = 0.0
                 iteration_metrics_sum[k] += iteration_metrics[k].item()
 
-                iteration_metrics_max[k] = max(iteration_metrics_max.get(k, float("-inf")), iteration_metrics[k].item())
+                iteration_metrics_max[k] = max(
+                    iteration_metrics_max.get(k, float("-inf")),
+                    iteration_metrics[k].item(),
+                )
 
             # Update progress bar
             if torch.cuda.is_available():
@@ -787,8 +828,8 @@ def attack_one_dataloader(
 
     for k, v in metrics_sum.items():
         metrics_mean[k] = v / n
-    metrics_mean['num_samples'] = n
-    
+    metrics_mean["num_samples"] = n
+
     for k, v in metrics_max.items():
         if "delta" in k:
             metrics_mean[f"{k}_datasetmax"] = v
@@ -846,7 +887,14 @@ def generate_outputs(
             )
         else:
             if attack_args is not None and attack_args["attack"] == "3dcc":
-                _write_to_npy_file(args, preds, dataloader_name, batch_idx, metadata, attack_args=attack_args)
+                _write_to_npy_file(
+                    args,
+                    preds,
+                    dataloader_name,
+                    batch_idx,
+                    metadata,
+                    attack_args=attack_args,
+                )
             else:
                 _write_to_npy_file(args, preds, dataloader_name, batch_idx, metadata)
 
@@ -880,7 +928,12 @@ def _write_to_npy_file(
     if args.flow_format != "original":
         flow_ext = args.flow_format
     else:
-        if "kitti" in dataloader_name or "hd1k" in dataloader_name or "sintel" in dataloader_name or "spring" in dataloader_name:
+        if (
+            "kitti" in dataloader_name
+            or "hd1k" in dataloader_name
+            or "sintel" in dataloader_name
+            or "spring" in dataloader_name
+        ):
             flow_ext = "png"
         else:
             flow_ext = "flo"
@@ -888,7 +941,9 @@ def _write_to_npy_file(
     for k, v in preds.items():
         if isinstance(v, np.ndarray):
             out_dir = out_root_dir
-            if perturbed_inputs is not None or (attack_args is not None and attack_args["attack"] == "3dcc"):
+            if perturbed_inputs is not None or (
+                attack_args is not None and attack_args["attack"] == "3dcc"
+            ):
                 for arg, val in attack_args.items():
                     out_dir = out_dir / f"{arg}={val}"
         if flow_ext == "png":
@@ -913,12 +968,16 @@ def _write_to_npy_file(
                 out_dir_imgs.mkdir(parents=True, exist_ok=True)
                 if v.max() <= 2:
                     if v.max() > 1:
-                        logger.info(f"This attack does not adhere to image range [0, 1]. "
-                                    f"Actual range is [{v.min()}, {v.max()}]")
+                        logger.info(
+                            f"This attack does not adhere to image range [0, 1]. "
+                            f"Actual range is [{v.min()}, {v.max()}]"
+                        )
                     v = v * 255
                 else:
-                    raise ValueError(f"Expected image in range [0, 1]. "
-                                     f"Passing image with range [{v.min()}, {v.max()}] is suspicious.")
+                    raise ValueError(
+                        f"Expected image in range [0, 1]. "
+                        f"Passing image with range [{v.min()}, {v.max()}] is suspicious."
+                    )
 
                 image = v[0, 0].detach().cpu()
                 image2 = v[0, 1].detach().cpu()
@@ -974,13 +1033,13 @@ def _write_to_file(
 
 if __name__ == "__main__":
     parser = _init_parser()
-    
+
     cli = FlowBenchCLI(
         attack_class=RegisteredAttack,
         model_class=RegisteredModel,
         subclass_mode_model=True,
         datamodule_class=FlowDataModuleFlowBench,
-        parser_kwargs={'parents': [parser]},
+        parser_kwargs={"parents": [parser]},
         run=False,
         parse_only=False,
         auto_configure_optimizers=False,
@@ -1005,7 +1064,7 @@ if __name__ == "__main__":
 
     model = cli.model
     model = restore_model(model, cfg.ckpt_path)
-    
+
     print("cfg.attack", cli.attack)
-    
+
     metrics_df = attack_single(cfg, model, cli.datamodule, cli.attack)
