@@ -1,11 +1,10 @@
-from argparse import Namespace
+
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 import torch
 from ptlflow.models.base_model.base_model import BaseModel, logger
 from attacks.attack_utils.utils import (
     get_image_tensors,
-    get_image_grads,
     replace_images_dic,
     get_flow_tensors,
 )
