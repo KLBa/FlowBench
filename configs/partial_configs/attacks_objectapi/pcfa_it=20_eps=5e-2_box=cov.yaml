@@ -6,3 +6,4 @@ attack_obj:
     attack_epsilon: 0.05
     attack_alpha: 1e-7
     pcfa_boxconstraint: change_of_variables
+    optim_strong_wolfe: True
