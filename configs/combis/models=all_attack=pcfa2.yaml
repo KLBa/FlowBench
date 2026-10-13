@@ -2,10 +2,14 @@
 # python -m flowbench.attacks_combis --config configs/combis/models=all_attack=pcfa.yaml --data.dataset_config_path ...
 
 config_1:
-  - configs/partial_configs/attacks_objectapi/pcfa2_it=1_eps=5e-3_delta=project+clip.yaml
-  - configs/partial_configs/attacks_objectapi/pcfa2_it=20_eps=5e-3_delta=project+clip.yaml
-config_2:
+  # prioritize
+  - configs/partial_configs/models/*raft*
+  - configs/partial_configs/models/*gma*
   - configs/partial_configs/models/*
+config_2:
+  - configs/partial_configs/attacks_objectapi/pcfa2_it=20_eps=5e-3_delta=project+clip.yaml
+  - configs/partial_configs/attacks_objectapi/pcfa2_it=20_eps=5e-2_delta=project+clip.yaml
+  - configs/partial_configs/attacks_objectapi/pcfa2_it=1_eps=5e-3_delta=project+clip.yaml
 config_3:
   - configs/partial_configs/data/kitti-2015-trainval.yaml
   - configs/partial_configs/data/sintel-final-trainval.yaml
@@ -15,3 +19,4 @@ output_path: outputs/flowbench_objectapi/v20261012/combis
 write_outputs: False
 skip_existing: True
 ignore_errors: True
+check_for_missing_grads: True
