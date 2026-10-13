@@ -2,10 +2,11 @@
 from typing import Any, Dict, Optional
 import torch
 from torch.utils.data import DataLoader
+import pytorch_lightning as pl
 
 from attacks.data.flow_datamodule_extended import FlowDataModuleFlowBench
 
-class BaseAttack(object):
+class BaseAttack(pl.LightningModule):
 
     def __init__(self,
                  precomputed: bool = False,

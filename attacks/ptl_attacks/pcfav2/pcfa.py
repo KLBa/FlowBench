@@ -53,6 +53,8 @@ class PCFA2(BaseAttack):
         if pcfa_boxconstraint == "change_of_variables":
             raise NotImplementedError()
 
+        self.save_hyperparameters()
+
 
     def forward(self, inputs: Dict[str, Any]):
         preds, perturbed_inputs, iteration_metrics = _pcfa2(
@@ -201,77 +203,6 @@ def _pcfa_attack2(
     # Zero all existing gradients
     model.zero_grad()
     optimizer.zero_grad()
-
-    if CHECK_FOR_MISSING_GRADS := True:
-
-        def summarize_missing_grads(named_grads):
-            """named_grads: list of (name, grad_or_None)."""
-            stats = defaultdict(lambda: [0, 0])  # prefix -> [num_without_grad, total]
-            for name, g in named_grads:
-                missing = g is None or torch.all(g == 0)
-                parts = name.split(".")
-                for i in range(
-                    1, len(parts)
-                ):  # every module prefix, excluding the parameter itself
-                    prefix = ".".join(parts[:i])
-                    stats[prefix][1] += 1
-                    stats[prefix][0] += int(missing)
-
-            reported = []
-            for prefix in sorted(stats, key=lambda p: p.count(".")):  # shallowest first
-                missing, total = stats[prefix]
-                if missing == total and not any(
-                    prefix.startswith(r + ".") for r in reported
-                ):
-                    reported.append(prefix)
-                    logger.warning(f"{prefix}: no gradient in ALL {total} parameters")
-            # if not reported:
-            #     logger.debug("All modules have gradients.")
-            return reported
-
-        def check_param_grads(model, compute_loss):
-            params = [(n, p) for n, p in model.named_parameters()]
-            saved = [p.requires_grad for _, p in params]
-
-            try:
-                for _, p in params:
-                    p.requires_grad_(True)
-                loss = compute_loss()
-                grads = torch.autograd.grad(
-                    loss, [p for _, p in params], allow_unused=True
-                )
-                return summarize_missing_grads(
-                    [(n, g) for (n, _), g in zip(params, grads)]
-                )
-            finally:
-                for (_, p), flag in zip(params, saved):
-                    p.requires_grad_(flag)
-
-        def _loss():
-            delta1, delta2 = transform_delta(
-                nw_delta1, nw_delta2, attack_args["attack_epsilon"], homogeneous=homogeneous, pcfa_deltaconstraint=attack_args["pcfa_deltaconstraint"]
-            )
-            nw_input1_closure, nw_input2_closure = image1 + delta1, image2 + delta2
-
-            # Predict the flow, InputModel does clipping to valid image range
-            flow_closure = model(inputs, nw_input1_closure, nw_input2_closure)[
-                "flows"
-            ].squeeze(0)
-            flow_closure = flow_closure.to(device)
-
-            loss_closure = get_loss(
-                f_type=attack_args["attack_loss"],
-                pred=flow_closure,
-                target=target
-            )
-            return loss_closure
-
-        # logger.debug("Check param gradients...")
-        __modules_without_grad = check_param_grads(model, _loss)
-        # Iteration metrics may not be the right place but we need to log this somewhere...
-        iteration_metrics["has_modules_without_grad"] = torch.tensor(
-            len(__modules_without_grad) > 0
-        )  # calling code assumes tensor
 
     for steps in range(attack_args["attack_iterations"]):
         def closure():

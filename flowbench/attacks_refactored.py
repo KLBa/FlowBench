@@ -18,6 +18,7 @@
 
 from argparse import ArgumentTypeError
 import ast
+from collections import defaultdict
 from collections.abc import Iterable
 import sys
 from jsonargparse import ArgumentParser, Namespace
@@ -202,6 +203,11 @@ def _init_parser() -> ArgumentParser:
         action="store_true",
         help="If set, compare the attacked flow to the zero flow and negative of the unattacked flow.",
     )
+    parser.add_argument(
+        "--check_for_missing_grads",
+        action="store_true",
+        help="If set, run the model once to check if gradients are propagated from the output flow to all of its parameters.",
+    )
 
     return parser
 
@@ -296,6 +302,14 @@ def attack_single(
         else:
             metrics = {"experiments": []}
         metrics["experiments"].append(output_dict)
+        # Check that metrics is serializable before writing an incomplete json
+        try:
+            json.dumps(metrics, indent=4)
+        except Exception as e:
+            logger.error(f"Exception {e}")
+            logger.info("Tried to serialize:", metrics)
+            logger.info(type(metrics["experiments"][0]["model"]))
+            raise e
         with open(output_filename, "w") as json_file:
             json.dump(metrics, json_file, indent=4)
         if iteration_metrics_mean:
@@ -455,6 +469,70 @@ def attack_one_dataloader(
             #     targeted_inputs = inputs.copy()
 
             iteration_metrics = {}
+
+            # Check if gradients are backpropagated to all model parameters
+            if args.check_for_missing_grads and i == 0:
+
+                def summarize_missing_grads(named_grads):
+                    """named_grads: list of (name, grad_or_None)."""
+                    stats = defaultdict(
+                        lambda: [0, 0]
+                    )  # prefix -> [num_without_grad, total]
+                    for name, g in named_grads:
+                        missing = g is None or torch.all(g == 0)
+                        parts = name.split(".")
+                        for i in range(
+                            1, len(parts)
+                        ):  # every module prefix, excluding the parameter itself
+                            prefix = ".".join(parts[:i])
+                            stats[prefix][1] += 1
+                            stats[prefix][0] += int(missing)
+
+                    reported = []
+                    for prefix in sorted(
+                        stats, key=lambda p: p.count(".")
+                    ):  # shallowest first
+                        missing, total = stats[prefix]
+                        if missing == total and not any(
+                            prefix.startswith(r + ".") for r in reported
+                        ):
+                            reported.append(prefix)
+                            logger.warning(
+                                f"{prefix}: no gradient in ALL {total} parameters"
+                            )
+                    # if not reported:
+                    #     logger.debug("All modules have gradients.")
+                    return reported
+
+                def check_param_grads(model, compute_loss):
+                    params = [(n, p) for n, p in model.named_parameters()]
+                    saved = [p.requires_grad for _, p in params]
+
+                    try:
+                        for _, p in params:
+                            p.requires_grad_(True)
+                        loss = compute_loss()
+                        grads = torch.autograd.grad(
+                            loss, [p for _, p in params], allow_unused=True
+                        )
+                        return summarize_missing_grads(
+                            [(n, g) for (n, _), g in zip(params, grads)]
+                        )
+                    finally:
+                        for (_, p), flag in zip(params, saved):
+                            p.requires_grad_(flag)
+
+                def _loss():
+                    # Predict the flow, InputModel does clipping to valid image range
+                    flow_closure = model(inputs)["flows"].squeeze(0)
+
+                    loss_closure = flow_closure.sum()
+                    return loss_closure
+
+                # logger.debug("Check param gradients...")
+                __modules_without_grad = check_param_grads(model, _loss)
+                # Iteration metrics may not be the right place but we need to log this somewhere...
+                number_of_modules_without_grad = torch.tensor(len(__modules_without_grad) > 0)
 
             # Perform attack
             if isinstance(attack_args, BaseAttack):
@@ -752,6 +830,15 @@ def attack_one_dataloader(
                 for key in metrics:
                     metrics_individual.setdefault(key, []).append(metrics[key].item())
 
+            if hasattr(attack_args, "hparams"):
+                _log_args = {**attack_args.hparams}
+            else:
+                _log_args = {
+                    k: v
+                    for k, v in attack_args.__dict__.items()
+                    if not k.startswith("_")
+                    and (isinstance(v, (str, int, float, bool, Iterable) or v is None))
+                }
             generate_outputs(
                 args,
                 preds,
@@ -761,7 +848,7 @@ def attack_one_dataloader(
                 perturbed_inputs,
                 attack_args={
                     "attack_name": attack_args.__class__.__name__,
-                    **{k: v for k, v in attack_args.__dict__.items() if not k.startswith("_") and (isinstance(v, (str, int, float, bool, Iterable) or v is None))}
+                    **_log_args,
                 },
             )
 
@@ -833,6 +920,8 @@ def attack_one_dataloader(
     for k, v in metrics_max.items():
         if "delta" in k:
             metrics_mean[f"{k}_datasetmax"] = v
+    
+    metrics_mean["has_modules_without_grad"] = number_of_modules_without_grad.item()
 
     iteration_metrics_mean = {}
     for k, v in iteration_metrics_sum.items():

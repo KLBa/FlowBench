@@ -42,6 +42,8 @@ class PCFA(BaseAttack):
         self.optim_mu = optim_mu
         self.optim_strong_wolfe = optim_strong_wolfe
 
+        self.save_hyperparameters()
+
     def forward(self, inputs: Dict[str, Any]):
         preds, perturbed_inputs, iteration_metrics = pcfa_func(
             attack_args=self.__dict__,
