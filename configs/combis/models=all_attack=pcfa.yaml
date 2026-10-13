@@ -3,7 +3,8 @@
 
 config_1:
   # prioritize
-  - configs/partial_configs/models/*raft*
+  - configs/partial_configs/models/_raft*
+  - configs/partial_configs/models/generated_raft*
   - configs/partial_configs/models/*gma*
   - configs/partial_configs/models/*
 config_2:
