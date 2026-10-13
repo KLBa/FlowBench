@@ -921,7 +921,8 @@ def attack_one_dataloader(
         if "delta" in k:
             metrics_mean[f"{k}_datasetmax"] = v
     
-    metrics_mean["has_modules_without_grad"] = number_of_modules_without_grad.item()
+    if args.check_for_missing_grads:
+        metrics_mean["has_modules_without_grad"] = number_of_modules_without_grad.item()
 
     iteration_metrics_mean = {}
     for k, v in iteration_metrics_sum.items():

@@ -12,7 +12,7 @@ config_3:
   - configs/partial_configs/data/chairs-val.yaml
 
 # global configs, passed to all calls (unless overwritten in configs above; not sure about resolution order) 
-output_path: outputs/flowbench_dev-fork/combis
+output_path: outputs/flowbench_objectapi/combis
 write_outputs: False
 skip_existing: True
 # ignore_errors: True

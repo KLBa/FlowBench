@@ -10,13 +10,14 @@ class PCFA(BaseAttack):
     def __init__(
         self, 
         attack_alpha: float = 1e-7,
-        attack_epsilon: float = 8 / 255,
+        attack_epsilon: float = 0.05,
         target: Literal["negative", "zero"] = "zero",
         pcfa_boxconstraint: Literal["clipping", "change_of_variables"] = "change_of_variables",
         attack_iterations: int = 3,
         attack_loss: str = "epe",
         optim_mu: Optional[float] = None,
         optim_strong_wolfe: bool = False,
+        best_iterate: bool = True,
     ):
         """
         Args:
@@ -30,8 +31,9 @@ class PCFA(BaseAttack):
             attack_loss (str, optional): Defaults to "epe".
             optim_mu (Optional[float], optional): Factor for enforcing the delta bound. If None, mu is dynamically computed from epsilon. Defaults to None.
             optim_strong_wolfe (bool, optional): whether the LBFGS optimizer should use line_search_fn="strong_wolfe". Defaults to False.
+            update_minima (bool, optional): If True, returns the perturbation with the smallest loss (original PCFA). If False, returns the last iteration (original FlowBench) 
         """
-        
+
          # also called eps_box, should be set to 1e-6 but we preserve the FlowBench default for now.
         super().__init__(targeted=True, target=target)
         self.attack_alpha = attack_alpha
@@ -41,6 +43,7 @@ class PCFA(BaseAttack):
         self.attack_loss = attack_loss
         self.optim_mu = optim_mu
         self.optim_strong_wolfe = optim_strong_wolfe
+        self.best_iterate = best_iterate
 
         self.save_hyperparameters()
 

@@ -184,6 +184,12 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
         # Iteration metrics may not we need to log this somewhere...
         iteration_metrics["has_modules_without_grad"] = torch.tensor(len(__modules_without_grad) > 0) # calling code assumes tensor
 
+    # Best perturbation found so far (original PCFA: smallest L2 norm, then closest to target, within the bound)
+    delta_below_threshold = False
+    delta12_min_val = float("inf")
+    aee_adv_tgt_min_val = float("inf")
+    preds_min, delta1_min, delta2_min = preds, delta1, delta2
+
     for steps in range(attack_args["attack_iterations"]):
         # Calculate the deltas from the quantities that go into the network
         delta1, delta2 = extract_deltas(
@@ -257,9 +263,42 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
         flow_pred = preds["flows"].squeeze(0)
         flow_pred = flow_pred.to(device)
 
-        #pdb.set_trace()
-        # save nw_inputs and deltas and flow_pred
+        if attack_args.get("best_iterate", False):
+            with torch.no_grad():
+                l2_delta12 = float(losses.two_norm_avg_delta(delta1, delta2))
+                aee_adv_tgt = float(losses.avg_epe(flow_pred, target))
+            update_minima = False
+            if not delta_below_threshold:
+                if l2_delta12 < delta12_min_val or (
+                    l2_delta12 == delta12_min_val and aee_adv_tgt < aee_adv_tgt_min_val
+                ):
+                    update_minima = True
+                    if l2_delta12 <= attack_args["attack_epsilon"]:
+                        delta_below_threshold = True
+            else:
+                if (
+                    l2_delta12 <= attack_args["attack_epsilon"]
+                    and aee_adv_tgt < aee_adv_tgt_min_val
+                ):
+                    update_minima = True
+            if update_minima:
+                iteration_metrics[f"val/selected_i{steps + 1}"] = torch.tensor(1.0)
+            else:
+                iteration_metrics[f"val/selected_i{steps + 1}"] = torch.tensor(0.0)
+        else:
+           update_minima = True
 
+        if update_minima:
+            delta12_min_val = l2_delta12
+            aee_adv_tgt_min_val = aee_adv_tgt
+            delta1_min = delta1.detach().clone()
+            delta2_min = delta2.detach().clone()
+            preds_min = {
+                k: (v.detach().clone() if torch.is_tensor(v) else v)
+                for k, v in preds.items()
+            }
+
+        # Log metrics
         iteration_metrics = iteration_metrics | losses.calc_delta_metrics(
             delta1, delta2, steps + 1
         )
@@ -267,7 +306,7 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
             model.model_loaded, preds, inputs, steps + 1, targeted_inputs
         )
 
-    return preds, delta1, delta2, iteration_metrics
+    return preds_min, delta1_min, delta2_min, iteration_metrics
 
 
 # For PCFA
