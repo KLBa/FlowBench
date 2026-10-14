@@ -263,10 +263,10 @@ def pcfa_attack(model, targeted_inputs, inputs, eps_box, device, optim_mu, attac
         flow_pred = preds["flows"].squeeze(0)
         flow_pred = flow_pred.to(device)
 
+        with torch.no_grad():
+            l2_delta12 = float(losses.two_norm_avg_delta(delta1, delta2))
+            aee_adv_tgt = float(losses.avg_epe(flow_pred, target))
         if attack_args.get("best_iterate", False):
-            with torch.no_grad():
-                l2_delta12 = float(losses.two_norm_avg_delta(delta1, delta2))
-                aee_adv_tgt = float(losses.avg_epe(flow_pred, target))
             update_minima = False
             if not delta_below_threshold:
                 if l2_delta12 < delta12_min_val or (

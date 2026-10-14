@@ -10,10 +10,10 @@ class PCFA(BaseAttack):
     def __init__(
         self, 
         attack_alpha: float = 1e-7,
-        attack_epsilon: float = 0.05,
+        attack_epsilon: float = 0.005,
         target: Literal["negative", "zero"] = "zero",
         pcfa_boxconstraint: Literal["clipping", "change_of_variables"] = "change_of_variables",
-        attack_iterations: int = 3,
+        attack_iterations: int = 20,
         attack_loss: str = "epe",
         optim_mu: Optional[float] = None,
         optim_strong_wolfe: bool = False,
@@ -24,10 +24,10 @@ class PCFA(BaseAttack):
             attack_alpha (float, optional): small numeric stabilization (`eps_box=1e-7` in the original PCFA code). Defaults to 1e-7.
             attack_epsilon (float, optional): bound on the average squared perturbation.
                 The attack aims to find a perturbation delta with delta.pow(2).mean() < attack_epsilon.
-                Defaults to 8/255.
+                Defaults to 0.005 (as in the original PCFA).
             target (Literal[&quot;negative&quot;, &quot;zero&quot;], optional): Defaults to "zero".
             pcfa_boxconstraint (Literal[&quot;clipping&quot;, &quot;change_of_variables&quot;], optional): Defaults to "change_of_variables".
-            attack_iterations (int, optional): Defaults to 3.
+            attack_iterations (int, optional): Defaults to 20 (as in the original PCFA).
             attack_loss (str, optional): Defaults to "epe".
             optim_mu (Optional[float], optional): Factor for enforcing the delta bound. If None, mu is dynamically computed from epsilon. Defaults to None.
             optim_strong_wolfe (bool, optional): whether the LBFGS optimizer should use line_search_fn="strong_wolfe". Defaults to False.
